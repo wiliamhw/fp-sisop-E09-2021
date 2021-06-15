@@ -31,6 +31,7 @@ void regist(int fd, char *username, char *password);
 int getInput(int fd, char *prompt, char *storage);
 int getUserId(const char *path, char *username, char *password);
 int getLastId(const char *path);
+void parseQuery(char *, char [20][50]);
 
 int main()
 {
@@ -62,31 +63,20 @@ void *routes(void *argv)
     chdir(currDir); // TODO:: comment on final
     int fd = *(int *) argv;
     char query[DATA_BUFFER], buf[DATA_BUFFER];
+    char parsed[20][50];
 
     while (read(fd, query, DATA_BUFFER) != 0) {
         puts(query);
+        parseQuery(query, parsed);
 
-        strcpy(buf, query);
-        char *cmd = strtok(buf, " ");
-
-        if (strcmp(cmd, "LOGIN") == 0) {
-            char *username = strtok(NULL, " ");
-            char *password = (strcmp(username, "root") != 0) 
-                            ? strtok(NULL, " ") : "root";
-            if (!login(fd, username, password))
+        if (strcmp(parsed[0], "LOGIN") == 0) {
+            if (!login(fd, parsed[1], parsed[2]))
                 break;
         }
-        else if (strcmp(cmd, "CREATE") == 0) {
-            cmd = strtok(NULL, " ");
-
-            if (strcmp(cmd, "USER") == 0) {
-                if (geteuid == 0) {
-                    char *username = strtok(NULL, " ");
-                    char *password = NULL;
-                    for (int i = 0; i < 3; i++) {
-                        password = strtok(NULL, " ");
-                    }
-                    regist(fd, username, password);
+        else if (strcmp(parsed[0], "CREATE") == 0) {
+            if (strcmp(parsed[1], "USER") == 0) {
+                if (curr_id == 0) {
+                    regist(fd, parsed[2], parsed[5]);
                 } else {
                     write(fd, "Forbidden action\n\n", SIZE_BUFFER);
                 }
@@ -187,6 +177,27 @@ int getLastId(const char *path)
         }
     }
     return id;
+}
+
+void parseQuery(char query[], char storage[20][50])
+{
+    char *buf = query;
+    char *temp = NULL;
+    memset(storage, '\0', sizeof(char) * 20 * 50);
+
+    int i = 0;
+    while ((temp = strtok(buf, " ")) != NULL && i < 20) {
+        if (buf != NULL) {
+            buf = NULL;
+        }
+        strcpy(storage[i++], temp);
+    }
+
+    // Remove ";""
+    char *ptr = strstr(storage[--i], ";");
+    if (ptr != NULL) {
+        *ptr = '\0';
+    }
 }
 
 

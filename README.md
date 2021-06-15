@@ -1,6 +1,7 @@
 # Info
 * Server hanya dapat menerima satu user yang sedang login.
 * Semua tabel memiliki ekstensi `.csv`.
+* Query tidak boleh melebihi 20 kata.
 
 # Setup
 1. Buat program server-client multi koneksi berdasarkan pengerjaan dari modul 2 no.1.

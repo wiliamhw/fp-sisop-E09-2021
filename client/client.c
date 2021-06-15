@@ -25,6 +25,9 @@ void getServerOutput(int fd, char *input);
 // Controller
 bool login(int, int, char *[]);
 
+// Helpet
+bool isValid(char *);
+
 int main(int argc, char *argv[])
 {
     pthread_t tid[2];
@@ -49,8 +52,9 @@ bool login(int fd, int argc, char *argv[])
 {
     char buf[DATA_BUFFER];
     if (geteuid() == 0) { // root
-        write(fd, "LOGIN root", SIZE_BUFFER);
-        puts("LOGIN root");
+        write(fd, "LOGIN root root", SIZE_BUFFER);
+        puts("LOGIN root root");
+
         strcpy(username, "root");
         type = "root";
     } 
@@ -61,6 +65,7 @@ bool login(int fd, int argc, char *argv[])
         sprintf(buf, "LOGIN %s %s", argv[2], argv[4]);
         write(fd, buf, SIZE_BUFFER);
         puts(buf);
+        
         strcpy(username, argv[2]);
         type = "user";
     } 
@@ -73,6 +78,19 @@ bool login(int fd, int argc, char *argv[])
     return strcmp(buf, "Login success\n") == 0;
 }
 
+bool isValid(char *message)
+{
+    if (strcmp(message, "quit") == 0) {
+        puts("Good bye :3");
+        exit(EXIT_SUCCESS);
+    }
+    else {
+        puts("Invalid query");
+        return false;
+    }
+    return true;
+}
+
 /**    SETUP    **/
 void *handleInput(void *client_fd)
 {
@@ -83,15 +101,16 @@ void *handleInput(void *client_fd)
         if (wait) continue;
         printf("%s@%s: ", type, username);
         fgets(message, DATA_BUFFER, stdin);
+
+        // Remove trailing \n
         char *tmp = strtok(message, "\n");
         if (tmp != NULL) {
             strcpy(message, tmp);
         }
-        if (strcmp(message, "quit") == 0) {
-            puts("Good bye :3");
-            exit(EXIT_SUCCESS);
+
+        if (isValid(message)) {
+            send(fd, message, SIZE_BUFFER, 0);
         }
-        send(fd, message, SIZE_BUFFER, 0);
         wait = true;
     }
 }
