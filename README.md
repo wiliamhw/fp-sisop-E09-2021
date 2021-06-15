@@ -6,10 +6,12 @@
 1. Buat program server-client multi koneksi berdasarkan pengerjaan dari modul 2 no.1.
    * Program server bernama `server.c`.
    * Program client bernama `client.c`.
-2. Buka `~/.bashrc`, lalu tambahkan `export PATH="$PATH:</path/to/client>"` di baris terakhir.
-   * Langkah ini dilakukan agar program client bisa diakses dari direktori apapun.
-3. Jalankan server pada Daemon.
-4. Untuk mematikan server Daemon, lakukan langkah berikut:
+2. Buka `~/.bashrc`, lalu tambahkan `export PATH="$PATH:</path/to/client/dir>"` di baris terakhir.
+   * Langkah ini dilakukan agar program client bisa diakses oleh user dari direktori apapun.
+3. Buka `/etc/sudoers`, lalu `export PATH="$PATH:</path/to/client/dir>"` di baris terakhir.
+   * Langkah ini dilakukan agar program client bisa diakses oleh root dari direktori apapun.
+4. Jalankan server pada Daemon.
+5. Untuk mematikan server Daemon, lakukan langkah berikut:
    1. Cari pid dari server dengan perintah `ps -aux | grep "server"`.
    2. Kill server dengan perintah `sudo kill -9 <pid>`.
 
@@ -35,6 +37,7 @@
    * Jika root, `id = 0`.
 5. Tampilkan tulisan **Login berhasil** ke client.
 6. Untuk setiap new line pada terminal client, tuliskan `<tipe akun>@id:` di bagian kiri terminal.
+7. Untuk keluar, tuliskan perintah `Quit` atau tekan `Ctrl + C` pada client.
 
 ### Fitur Register
 1. Pastikan bahwa user yang sedang login saat ini adalah root.

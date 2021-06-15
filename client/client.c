@@ -12,20 +12,23 @@
 #define DATA_BUFFER 300
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
-char inputPath[DATA_BUFFER];
-bool _inputPath = false;
 
+// SETUP
 int create_tcp_client_socket();
 void *handleInput(void *client_fd);
 void *handleOutput(void *client_fd);
 void getServerInput(int fd, char *input);
-void sendFile(int fd);
-void writeFile(int fd);
 
-int main()
+// Controller
+bool login(int, char *[]);
+
+int main(int argc, char *argv[])
 {
     pthread_t tid[2];
     int client_fd = create_tcp_client_socket();
+
+    login(argc, argv);
+    printf("UID: %d\n", geteuid());
 
     pthread_create(&(tid[0]), NULL, &handleOutput, (void *) &client_fd);
     pthread_create(&(tid[1]), NULL, &handleInput, (void *) &client_fd);
@@ -37,17 +40,25 @@ int main()
     return 0;
 }
 
+/**    CONTROLLER    **/
+bool login(int argc, char *argv[])
+{
+    printf("%d\n", argc);
+    for (int i = 0; i < argc; i++) {
+        puts(argv[i]);
+    }
+    return true;
+}
+
+/**    SETUP    **/
 void *handleInput(void *client_fd)
 {
     int fd = *(int *) client_fd;
     char message[DATA_BUFFER] = {0};
 
     while (1) {
-        gets(message);
+        fgets(message, DATA_BUFFER, stdin);
         send(fd, message, SIZE_BUFFER, 0);
-        if (_inputPath) {
-            strcpy(inputPath, message);
-        }
     }
 }
 
@@ -60,66 +71,8 @@ void *handleOutput(void *client_fd)
         memset(message, 0, SIZE_BUFFER);
         getServerInput(fd, message);
         printf("%s", message);
-        
-        if (strcmp(message, "Filepath: ") == 0) {
-            _inputPath = true;
-        } else if (strcmp(message, "Start sending file\n") == 0) {
-            sendFile(fd);
-            _inputPath = false;
-        } else if (strcmp(message, "Error: file is already uploaded\n") == 0) {
-            _inputPath = false;
-        } else if (strcmp(message, "Start receiving file\n") == 0) {
-            writeFile(fd);
-        } 
         fflush(stdout);
     }
-}
-
-void sendFile(int fd)
-{
-    printf("Sending [%s] file to server!\n", inputPath);
-    int ret_val;
-    FILE *fp = fopen(inputPath, "r");
-    char buf[DATA_BUFFER] = {0};
-
-    if (fp) {
-        send(fd, "File found", SIZE_BUFFER, 0);
-
-        fseek(fp, 0L, SEEK_END);
-        int size = ftell(fp);
-        rewind(fp);
-        sprintf(buf, "%d", size);
-        send(fd, buf, SIZE_BUFFER, 0);
-
-        while ((ret_val = fread(buf, 1, 1, fp)) > 0) {
-            send(fd, buf, 1, 0);
-        } 
-        printf("Sending file finished!\n");
-        fclose(fp);
-    } else {
-        printf("File not found\n");
-        send(fd, "File not found", SIZE_BUFFER, 0);
-    }
-}
-
-void writeFile(int fd)
-{
-    char buf[DATA_BUFFER] = {0};
-    int ret_val = recv(fd, buf, DATA_BUFFER, 0);
-    FILE *fp = fopen(buf, "w+");
-
-    recv(fd, buf, DATA_BUFFER, 0);
-    int size = atoi(buf);
-    
-    while (size > 0) {
-        ret_val = recv(fd, buf, DATA_BUFFER, 0);
-        fwrite(buf, 1, ret_val, fp);
-        memset(buf, 0, SIZE_BUFFER);
-        size -= ret_val;
-    }
-    puts("Send file finished");
-    send(fd, "Send file finished", SIZE_BUFFER, 0);
-    fclose(fp);
 }
 
 void getServerInput(int fd, char *input)

@@ -14,19 +14,9 @@
 int curr_fd = -1;
 char auth_user[2][DATA_BUFFER]; // [0] => id, [1] => pass
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
-const char *USER_TABLE = "users.csv";
-const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
 
-typedef struct {
-    int fd;
-    int argc;
-    char *argv[];
-}
-InitData;
-
-// Setup
+// Socket setup
 int create_tcp_server_socket();
-int *makeDaemon(pid_t *pid, pid_t *sid);
 
 // Routes & controller
 void *routes(void *argv);
@@ -47,31 +37,22 @@ char *getFileName(char *filePath);
 bool validLogin(FILE *fp, char *id, char *password);
 bool isRegistered(FILE *fp, char *id);
 bool alreadyDownloaded(FILE *fp, char *filename);
-bool isRoot(); // new
 void parseFilePath(char *filepath, char *raw_filename, char *ext);
 
-int main(int argc, char *argv[])
+int main()
 {
-    // TODO:: Delete unneeded function
-
-    // TODO:: Uncomment on final
-    // pid_t pid, sid;
-    // int *status = makeDaemon(&pid, &sid);
-
     socklen_t addrlen;
     struct sockaddr_in new_addr;
     pthread_t tid;
     char buf[DATA_BUFFER];
     int server_fd = create_tcp_server_socket();
-    InitData data;
+    int new_fd;
 
     while (1) {
-        data.fd = accept(server_fd, (struct sockaddr *)&new_addr, &addrlen);
-        if (data.fd >= 0) {
-            printf("Accepted a new connection with fd: %d\n", data.fd);
-            data.argc = argc;
-            memcpy(data.argv, argc, sizeof(argv));
-            pthread_create(&tid, NULL, &routes, (void *) &data);
+        new_fd = accept(server_fd, (struct sockaddr *)&new_addr, &addrlen);
+        if (new_fd >= 0) {
+            printf("Accepted a new connection with fd: %d\n", new_fd);
+            pthread_create(&tid, NULL, &routes, (void *) &new_fd);
         } else {
             fprintf(stderr, "Accept failed [%s]\n", strerror(errno));
         }
@@ -79,25 +60,27 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void *routes(void *data)
+void *routes(void *argv)
 {
-    char *argv[];
+    int fd = *(int *) argv;
     char cmd[DATA_BUFFER];
-    int fd = *(InitData *) data.fd;
-    int argc = *(InitData *) data.argc;
-    memcpy(argv, *(InitData *) data.argv, sizeof(data.argv));
-    
+
     while (recv(fd, cmd, DATA_BUFFER, MSG_PEEK | MSG_DONTWAIT) != 0) {
+        // public route
         if (fd != curr_fd) {
-            send(fd, "Tidak dapat mengakses server. Tunggu pengguna lain logout dari server.\n", SIZE_BUFFER, 0);
-        } else {
-            if (isRoot) {
-                auth_user[0] = 0;
-                auth_user[1] = "root";
-            } else {
+            if (getInput(fd, "\nSelect command:\n1. Login\n2. Register\n", cmd) == 0) break;
+            write(fd, "\n", SIZE_BUFFER);
 
+            if (strcmp(cmd, "login") == 0 || strcmp(cmd, "1") == 0) {
+                login(fd);
+            } 
+            else if (strcmp(cmd, "register") == 0 || strcmp(cmd, "2") == 0) {
+                regist(fd);
+            } 
+            else {
+                send(fd, "Error: Invalid command\n", SIZE_BUFFER, 0);
             }
-
+        } else { 
             // protected route
             char prompt[DATA_BUFFER];
             strcpy(prompt, "\nSelect command:\n");
@@ -261,7 +244,7 @@ void login(int fd)
         return;
     }
     char id[DATA_BUFFER], password[DATA_BUFFER];
-    FILE *fp = fopen(USER_TABLE, "a+");
+    FILE *fp = fopen("akun.txt", "a+");
 
     if (getCredentials(fd, id, password) != 0) {
         if (validLogin(fp, id, password)) {
@@ -279,7 +262,7 @@ void login(int fd)
 void regist(int fd)
 {
     char id[DATA_BUFFER], password[DATA_BUFFER];
-    FILE *fp = fopen(USER_TABLE, "a+");
+    FILE *fp = fopen("akun.txt", "a+");
 
     if (getCredentials(fd, id, password) != 0) {
         if (isRegistered(fp, id)) {
@@ -429,12 +412,7 @@ bool alreadyDownloaded(FILE *fp, char *filename)
     return false;
 }
 
-bool isRoot()
-{
-    return (geteuid() == 0);
-}
-
-/****   SETUP    *****/
+/****   SOCKET SETUP    *****/
 int create_tcp_server_socket()
 {
     struct sockaddr_in saddr;
@@ -474,28 +452,4 @@ int create_tcp_server_socket()
         exit(EXIT_FAILURE);
     }
     return fd;
-}
-
-int *makeDaemon(pid_t *pid, pid_t *sid)
-{
-    int status;
-    *pid = fork();
-
-    if (*pid != 0) {
-        exit(EXIT_FAILURE);
-    }
-    if (*pid > 0) {
-        exit(EXIT_SUCCESS);
-    }
-    umask(0);
-
-    *sid = setsid();
-    if (*sid < 0 || chdir(currDir) < 0) {
-        exit(EXIT_FAILURE);
-    }
-
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-    return &status;
 }
