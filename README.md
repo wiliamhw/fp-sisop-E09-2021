@@ -40,16 +40,19 @@
    * Jika root, `id = 0`.
 6. Jika login gagal, tampilkan pesan gagal dari server ke client.
 7. Jika sukses, tampilkan tulisan **Login success** ke client.
-8. Untuk setiap new line pada terminal client, tuliskan `<tipe akun>@id:` di bagian kiri terminal.
-9.  Untuk keluar, tuliskan perintah `Quit` atau tekan `Ctrl + C` pada client.
+8. Untuk setiap new line pada terminal client, tuliskan `<tipe akun>@<username>:` di bagian kiri terminal.
+   * Ada dua tipe akun, yaitu **user** dan **root**.
+9.  Untuk keluar, tuliskan perintah `quit` atau tekan `Ctrl + C` pada client.
 
 ### Fitur Register
 1. Pastikan bahwa user yang sedang login saat ini adalah root.
-   * Jika bukan, tampilkan **Error, user tidak diizinkan untuk membuat user baru**.
+   * Jika bukan, tampilkan pesan error.
 2. Dapatkan username dan password akun user baru dari command line argument.
-   * Format perintah: `CREATE USER <username> IDENTIFIED BY <password>`.
-3. Pastikan tidak ada username yang duplikat.
-   * Jika ada, tampilkan **User telah terdaftar**.
-4. Masukan username, password, beserta id ke tabel **users**.
+   * Format perintah: `CREATE USER <username> IDENTIFIED BY <password>;`.
+3. Validasi input di bagian client. **TODO**
+   * Cek apakah format query sudah sesuai.
+4. Pastikan tidak ada username yang duplikat di db.
+   * Jika ada, tampilkan **Error::User is already registered**.
+5. Masukan username, password, beserta id ke tabel **users**.
    * Format: `id,username,password`
-5. Tampilkan tulisan **Register berhasil** ke client.
+6. Tampilkan tulisan **Register success** ke client.

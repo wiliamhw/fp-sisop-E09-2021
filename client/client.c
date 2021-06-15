@@ -12,12 +12,15 @@
 #define DATA_BUFFER 300
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
+char username[DATA_BUFFER] = {0};
+char *type = NULL;
+bool wait = false;
 
 // SETUP
 int create_tcp_client_socket();
 void *handleInput(void *client_fd);
 void *handleOutput(void *client_fd);
-void getServerInput(int fd, char *input);
+void getServerOutput(int fd, char *input);
 
 // Controller
 bool login(int, int, char *[]);
@@ -46,16 +49,20 @@ bool login(int fd, int argc, char *argv[])
 {
     char buf[DATA_BUFFER];
     if (geteuid() == 0) { // root
-        write(fd, "login root", SIZE_BUFFER);
-        puts("login root");
+        write(fd, "LOGIN root", SIZE_BUFFER);
+        puts("LOGIN root");
+        strcpy(username, "root");
+        type = "root";
     } 
     else if (argc == 5
         && strcmp(argv[1] , "-u") == 0
         && strcmp(argv[3] , "-p") == 0
     ) { // user
-        sprintf(buf, "login %s %s", argv[2], argv[4]);
+        sprintf(buf, "LOGIN %s %s", argv[2], argv[4]);
         write(fd, buf, SIZE_BUFFER);
         puts(buf);
+        strcpy(username, argv[2]);
+        type = "user";
     } 
     else {
         puts("Error::Invalid argument");
@@ -63,7 +70,7 @@ bool login(int fd, int argc, char *argv[])
     }
     read(fd, buf, SIZE_BUFFER);
     puts(buf);
-    return (strcmp(buf, "Login success\n") == 0);
+    return strcmp(buf, "Login success\n") == 0;
 }
 
 /**    SETUP    **/
@@ -73,8 +80,19 @@ void *handleInput(void *client_fd)
     char message[DATA_BUFFER] = {0};
 
     while (1) {
+        if (wait) continue;
+        printf("%s@%s: ", type, username);
         fgets(message, DATA_BUFFER, stdin);
+        char *tmp = strtok(message, "\n");
+        if (tmp != NULL) {
+            strcpy(message, tmp);
+        }
+        if (strcmp(message, "quit") == 0) {
+            puts("Good bye :3");
+            exit(EXIT_SUCCESS);
+        }
         send(fd, message, SIZE_BUFFER, 0);
+        wait = true;
     }
 }
 
@@ -85,13 +103,14 @@ void *handleOutput(void *client_fd)
 
     while (1) {
         memset(message, 0, SIZE_BUFFER);
-        getServerInput(fd, message);
+        getServerOutput(fd, message);
         printf("%s", message);
         fflush(stdout);
+        wait = false;
     }
 }
 
-void getServerInput(int fd, char *input)
+void getServerOutput(int fd, char *input)
 {
     if (recv(fd, input, DATA_BUFFER, 0) == 0) {
         printf("Disconnected from server\n");
