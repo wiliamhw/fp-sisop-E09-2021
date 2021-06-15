@@ -65,7 +65,7 @@ bool login(int fd, int argc, char *argv[])
         sprintf(buf, "LOGIN %s %s", argv[2], argv[4]);
         write(fd, buf, SIZE_BUFFER);
         puts(buf);
-        
+
         strcpy(username, argv[2]);
         type = "user";
     } 
@@ -80,6 +80,16 @@ bool login(int fd, int argc, char *argv[])
 
 bool isValid(char *message)
 {
+    /*
+    * Cek:
+    * 1. Jumlah kata
+    * 2. Format perintah
+    * 3. Tidak ada kata yang NULL
+    * 4. Diakhiri dengan titik koma (;)
+    * 5. Atur authorisasi (akses) dari akun user dan root
+    * 
+    * Jika return bernilai false, message tidak dikirim ke server
+    */
     if (strcmp(message, "quit") == 0) {
         puts("Good bye :3");
         exit(EXIT_SUCCESS);
