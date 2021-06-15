@@ -75,6 +75,8 @@ void *routes(void *argv)
     char query[DATA_BUFFER], buf[DATA_BUFFER];
 
     while (read(fd, query, DATA_BUFFER) != 0) {
+        puts(query);
+
         strcpy(buf, query);
         char *cmd = strtok(buf, " ");
 
@@ -96,6 +98,45 @@ void *routes(void *argv)
 }
 
 /****   Controllers   *****/
+bool login(int fd, char *username, char *password)
+{
+    if (curr_fd != -1) {
+        write(fd, "Server is busy, wait for other user to logout.\n", SIZE_BUFFER);
+        return false;
+    }
+
+    int id = -1;
+    char *_id = NULL;
+    if (strcmp(username, "root") == 0) {
+        id = 0;
+    } else { // Check DB
+        FILE *fp = fopen(USERS_TABLE, "r");
+        if (fp != NULL) {
+            char db[DATA_BUFFER], input[DATA_BUFFER];
+            sprintf(input, "%s,%s", username, password);
+
+            while (fscanf(fp, "%s", db) != EOF) {
+                char *temp = strstr(db, ",") + 1; // Get username and password from db
+                if (strcmp(temp, input) == 0) {
+                    _id = strtok(db, ",");
+                    id = atoi(_id);  // Get id from db
+                    break;
+                }
+            }
+            fclose(fp);
+        }
+    }
+    if (id == -1) {
+        write(fd, "Error::Invalid id or password\n", SIZE_BUFFER);
+        return false;
+    } else {
+        write(fd, "Login success\n", SIZE_BUFFER);
+        curr_fd = fd;
+        curr_id = id;
+    }
+    return true;
+}
+
 void see(char *buf, int fd, bool isFind)
 {
     int counter = 0;
@@ -203,44 +244,6 @@ void add(char *buf, int fd)
         }
     }
     fclose(fp);
-}
-
-bool login(int fd, char *username, char *password)
-{
-    if (curr_fd != -1) {
-        write(fd, "Server is busy, wait for other user to logout.\n", SIZE_BUFFER);
-        return false;
-    }
-
-    int id = -1;
-    if (strcmp(username, "root") == 0) {
-        id = 0;
-    } else {
-        FILE *fp = fopen(USERS_TABLE, "r");
-        if (fp != NULL) {
-            char db[DATA_BUFFER], input[DATA_BUFFER];
-            sprintf(input, "%s,%s", username, password);
-
-            while (fscanf(fp, "%s", db) != EOF) {
-                char *temp = strstr(db, ",") + 1; // Get username and password from db
-                if (strcmp(temp, input) == 0) {
-                    id = atoi(strtok(db, ","));  // Get id from db
-                    break;
-                }
-            }
-            fclose(fp);
-        }
-    }
-
-    if (id == -1) {
-        write(fd, "Error::Invalid id or password\n", SIZE_BUFFER);
-        return false;
-    } else {
-        write(fd, "Login success\n", SIZE_BUFFER);
-        curr_fd = fd;
-        curr_id = id;
-    }
-    return true;
 }
 
 void regist(int fd)
