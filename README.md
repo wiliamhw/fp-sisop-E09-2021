@@ -26,18 +26,22 @@
 
 ## Penyelesaian
 ### Fitur Login
-1. Buat fungsi yang mendeteksi apakah yang akan login adalah root atau bukan.
-   * Jika login degan root, maka `geteuid() == 0`.
+1. Patikan tidak ada akun yang sedang login.
+   * Jika ada akun lain, tulis **Server is busy, wait for other user to logout.** di terminal client.
 2. Jika pengguna tidak login sebagai root, dapatkan username dan password dari command line argument.
    * Format perintah: `client -u <username> -p <password>`.
-3. Cek username dan passwod di tabel **users** (di dalam db **config**).
+3. Validasi argument di sisi client dan kirim ke server dengan format `login <username> <password>`.
+   * Jika yang login adalah root, kirim `login root` ke server.
+   * Jika argument tidak valid, tampilkan **Argumen tidak valid**.
+4. Cek username dan password di tabel **users** (di dalam db **config**).
    1. Jika ada, dapatkan id dari user tersebut.
-   2. Jika tidak ada, tampilkan **Error, invalid username/password**.
-4. Simpan id dari current user di server.
+   2. Jika tidak ada, tampilkan **Error::Invalid id or password**.
+5. Simpan id dari current user di server.
    * Jika root, `id = 0`.
-5. Tampilkan tulisan **Login berhasil** ke client.
-6. Untuk setiap new line pada terminal client, tuliskan `<tipe akun>@id:` di bagian kiri terminal.
-7. Untuk keluar, tuliskan perintah `Quit` atau tekan `Ctrl + C` pada client.
+6. Jika login gagal, tampilkan pesan gagal dari server ke client.
+7. Jika sukses, tampilkan tulisan **Login success** ke client.
+8. Untuk setiap new line pada terminal client, tuliskan `<tipe akun>@id:` di bagian kiri terminal.
+9.  Untuk keluar, tuliskan perintah `Quit` atau tekan `Ctrl + C` pada client.
 
 ### Fitur Register
 1. Pastikan bahwa user yang sedang login saat ini adalah root.

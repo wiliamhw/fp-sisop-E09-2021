@@ -12,15 +12,20 @@
 #define DATA_BUFFER 300
 
 int curr_fd = -1;
+int curr_id = -1;
 char auth_user[2][DATA_BUFFER]; // [0] => id, [1] => pass
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 
+const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
+const char *USERS_TABLE = "./config/users.csv";
+
 // Socket setup
 int create_tcp_server_socket();
+int *makeDaemon(pid_t *pid, pid_t *sid);
 
 // Routes & controller
 void *routes(void *argv);
-void login(int fd);
+bool login(int fd, char *username, char *password); // adjusted
 void regist(int fd);
 void add(char *buf, int fd);
 void download(char *filename, int fd);
@@ -34,13 +39,16 @@ int getCredentials(int fd, char *id, char *password);
 int writeFile(int fd, char *dirname, char *targetFileName);
 int sendFile(int fd, char *filename);
 char *getFileName(char *filePath);
-bool validLogin(FILE *fp, char *id, char *password);
 bool isRegistered(FILE *fp, char *id);
 bool alreadyDownloaded(FILE *fp, char *filename);
 void parseFilePath(char *filepath, char *raw_filename, char *ext);
 
 int main()
 {
+    // TODO:: uncomment on final
+    // pid_t pid, sid;
+    // int *status = makeDaemon(&pid, &sid);
+
     socklen_t addrlen;
     struct sockaddr_in new_addr;
     pthread_t tid;
@@ -62,66 +70,26 @@ int main()
 
 void *routes(void *argv)
 {
+    chdir(currDir); // TODO:: comment on final
     int fd = *(int *) argv;
-    char cmd[DATA_BUFFER];
+    char query[DATA_BUFFER], buf[DATA_BUFFER];
 
-    while (recv(fd, cmd, DATA_BUFFER, MSG_PEEK | MSG_DONTWAIT) != 0) {
-        // public route
-        if (fd != curr_fd) {
-            if (getInput(fd, "\nSelect command:\n1. Login\n2. Register\n", cmd) == 0) break;
-            write(fd, "\n", SIZE_BUFFER);
+    while (read(fd, query, DATA_BUFFER) != 0) {
+        strcpy(buf, query);
+        char *cmd = strtok(buf, " ");
 
-            if (strcmp(cmd, "login") == 0 || strcmp(cmd, "1") == 0) {
-                login(fd);
-            } 
-            else if (strcmp(cmd, "register") == 0 || strcmp(cmd, "2") == 0) {
-                regist(fd);
-            } 
-            else {
-                send(fd, "Error: Invalid command\n", SIZE_BUFFER, 0);
-            }
-        } else { 
-            // protected route
-            char prompt[DATA_BUFFER];
-            strcpy(prompt, "\nSelect command:\n");
-            strcat(prompt, "1. Add\n");
-            strcat(prompt, "2. Download <filename with extension>\n");
-            strcat(prompt, "3. Delete <filename with extension>\n");
-            strcat(prompt, "4. See\n");
-            strcat(prompt, "5. Find <query string>\n");
-            if (getInput(fd, prompt, cmd) == 0) break;
-            write(fd, "\n", SIZE_BUFFER);
-
-            if (strcmp(cmd, "add") == 0 || strcmp(cmd, "1") == 0) {
-                add(cmd, fd);
-            } 
-            else if (strcmp(cmd, "see") == 0 || strcmp(cmd, "4") == 0) {
-                see(cmd, fd, false);
-            }
-            else {
-                char *tmp = strtok(cmd, " ");
-                char *tmp2 = strtok(NULL, " ");
-                if (!tmp2) {
-                    send(fd, "Error: Second argument not specified\n", SIZE_BUFFER, 0);
-                } 
-                else if (strcasecmp(tmp, "download") == 0) {
-                    download(tmp2, fd);
-                } 
-                else if (strcasecmp(tmp, "delete") == 0) {
-                    delete(tmp2, fd);
-                }
-                else if (strcasecmp(tmp, "find") == 0) {
-                    see(tmp2, fd, true);
-                }
-                else {
-                    send(fd, "Error: Invalid command\n", SIZE_BUFFER, 0);
-                }
-            }
+        if (strcmp(cmd, "login") == 0) {
+            char *username = strtok(NULL, " ");
+            char *password = (strcmp(username, "root") != 0) 
+                            ? strtok(NULL, " ") : "root";
+            if (!login(fd, username, password))
+                break;
         }
+
         sleep(0.001);
     }
     if (fd == curr_fd) {
-        curr_fd = -1;
+        curr_fd = curr_id = -1;
     }
     printf("Close connection with fd: %d\n", fd);
     close(fd);
@@ -237,32 +205,48 @@ void add(char *buf, int fd)
     fclose(fp);
 }
 
-void login(int fd)
+bool login(int fd, char *username, char *password)
 {
     if (curr_fd != -1) {
-        send(fd, "Server is busy. Wait until other client has logout.\n", SIZE_BUFFER, 0);
-        return;
+        write(fd, "Server is busy, wait for other user to logout.\n", SIZE_BUFFER);
+        return false;
     }
-    char id[DATA_BUFFER], password[DATA_BUFFER];
-    FILE *fp = fopen("akun.txt", "a+");
 
-    if (getCredentials(fd, id, password) != 0) {
-        if (validLogin(fp, id, password)) {
-            send(fd, "Login success\n", SIZE_BUFFER, 0);
-            curr_fd = fd;
-            strcpy(auth_user[0], id);
-            strcpy(auth_user[1], password);
-        } else {
-            send(fd, "Wrong id or password\n", SIZE_BUFFER, 0);
+    int id = -1;
+    if (strcmp(username, "root") == 0) {
+        id = 0;
+    } else {
+        FILE *fp = fopen(USERS_TABLE, "r");
+        if (fp != NULL) {
+            char db[DATA_BUFFER], input[DATA_BUFFER];
+            sprintf(input, "%s,%s", username, password);
+
+            while (fscanf(fp, "%s", db) != EOF) {
+                char *temp = strstr(db, ",") + 1; // Get username and password from db
+                if (strcmp(temp, input) == 0) {
+                    id = atoi(strtok(db, ","));  // Get id from db
+                    break;
+                }
+            }
+            fclose(fp);
         }
     }
-    fclose(fp);
+
+    if (id == -1) {
+        write(fd, "Error::Invalid id or password\n", SIZE_BUFFER);
+        return false;
+    } else {
+        write(fd, "Login success\n", SIZE_BUFFER);
+        curr_fd = fd;
+        curr_id = id;
+    }
+    return true;
 }
 
 void regist(int fd)
 {
     char id[DATA_BUFFER], password[DATA_BUFFER];
-    FILE *fp = fopen("akun.txt", "a+");
+    FILE *fp = fopen(USERS_TABLE, "a+");
 
     if (getCredentials(fd, id, password) != 0) {
         if (isRegistered(fp, id)) {
@@ -382,16 +366,6 @@ int getInput(int fd, char *prompt, char *storage)
     return ret_val;
 }
 
-bool validLogin(FILE *fp, char *id, char *password)
-{
-    char db[DATA_BUFFER], input[DATA_BUFFER];
-    sprintf(input, "%s:%s", id, password);
-    while (fscanf(fp, "%s", db) != EOF) {
-        if (strcmp(db, input) == 0) return true;
-    }
-    return false;
-}
-
 bool isRegistered(FILE *fp, char *id)
 {
     char db[DATA_BUFFER], *tmp;
@@ -452,4 +426,28 @@ int create_tcp_server_socket()
         exit(EXIT_FAILURE);
     }
     return fd;
+}
+
+int *makeDaemon(pid_t *pid, pid_t *sid)
+{
+    int status;
+    *pid = fork();
+
+    if (*pid != 0) {
+        exit(EXIT_FAILURE);
+    }
+    if (*pid > 0) {
+        exit(EXIT_SUCCESS);
+    }
+    umask(0);
+
+    *sid = setsid();
+    if (*sid < 0 || chdir(currDir) < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    return &status;
 }

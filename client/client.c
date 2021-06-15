@@ -20,16 +20,17 @@ void *handleOutput(void *client_fd);
 void getServerInput(int fd, char *input);
 
 // Controller
-bool login(int, char *[]);
+bool login(int, int, char *[]);
 
 int main(int argc, char *argv[])
 {
     pthread_t tid[2];
     int client_fd = create_tcp_client_socket();
 
-    login(argc, argv);
-    printf("UID: %d\n", geteuid());
-
+    if (!login(client_fd, argc, argv)) {
+        return -1;
+    }
+    
     pthread_create(&(tid[0]), NULL, &handleOutput, (void *) &client_fd);
     pthread_create(&(tid[1]), NULL, &handleInput, (void *) &client_fd);
 
@@ -41,13 +42,28 @@ int main(int argc, char *argv[])
 }
 
 /**    CONTROLLER    **/
-bool login(int argc, char *argv[])
+bool login(int fd, int argc, char *argv[])
 {
-    printf("%d\n", argc);
-    for (int i = 0; i < argc; i++) {
-        puts(argv[i]);
+    char buf[DATA_BUFFER];
+    if (geteuid() == 0) { // root
+        write(fd, "login root", SIZE_BUFFER);
+        puts("login root");
+    } 
+    else if (argc == 5
+        && strcmp(argv[1] , "-u") == 0
+        && strcmp(argv[3] , "-p") == 0
+    ) { // user
+        sprintf(buf, "login %s %s", argv[2], argv[4]);
+        write(fd, buf, SIZE_BUFFER);
+        puts(buf);
+    } 
+    else {
+        puts("Error::Invalid argument");
+        return false;
     }
-    return true;
+    read(fd, buf, SIZE_BUFFER);
+    puts(buf);
+    return (strcmp(buf, "Login success\n") == 0);
 }
 
 /**    SETUP    **/
@@ -78,7 +94,7 @@ void *handleOutput(void *client_fd)
 void getServerInput(int fd, char *input)
 {
     if (recv(fd, input, DATA_BUFFER, 0) == 0) {
-        printf("Server shutdown\n");
+        printf("Disconnected from server\n");
         exit(EXIT_SUCCESS);
     }
 }
