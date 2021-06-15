@@ -78,7 +78,7 @@ void *routes(void *argv)
                 if (curr_id == 0) {
                     regist(fd, parsed[2], parsed[5]);
                 } else {
-                    write(fd, "Forbidden action\n\n", SIZE_BUFFER);
+                    write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
                 }
             }
             else {
