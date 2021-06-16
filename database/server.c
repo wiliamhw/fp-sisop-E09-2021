@@ -30,13 +30,15 @@ void *routes(void *argv);
 bool login(int fd, char *username, char *password);
 void regist(int fd, char *username, char *password);
 void useDB(int fd, char *db_name);
+void grantDB(int fd, char *db_name, char *username);
 
 // Helper
 int getInput(int fd, char *prompt, char *storage);
 int getUserId(char *username, char *password);
 int getLastId(char *db_name, char *table);
 void parseQuery(char *query, char storage[20][DATA_BUFFER]);
-FILE *getTable(char *db, char *table, char *cmd, char *collumns);
+FILE *getTable(char *db_name, char *table, char *cmd, char *collumns);
+bool dirExist(int fd, char *db_name);
 
 int main()
 {
@@ -90,6 +92,9 @@ void *routes(void *argv)
         else if (strcmp(parsed[0], "USE") == 0) {
             useDB(fd, parsed[1]);
         }
+        else if (strcmp(parsed[0], "GRANT") == 0) {
+            grantDB(fd, parsed[2], parsed[4]);
+        }
         else write(fd, "Invalid query\n\n", SIZE_BUFFER);
     }
     if (fd == curr_fd) {
@@ -101,20 +106,55 @@ void *routes(void *argv)
 }
 
 /****   Controllers   *****/
-void useDB(int fd, char *db_name)
+void grantDB(int fd, char *db_name, char *username)
 {
-    DIR *dp = opendir(db_name);
-    if (dp == NULL) {
-        write(fd, "Error::Database not found\n\n", SIZE_BUFFER);
+    if (curr_id != 0) {
+        write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
         return;
     }
+    if (!dirExist(fd, db_name)) {
+        return;
+    }
+    int target_id = getUserId(username, NULL);
+    if (target_id == -1) {
+        write(fd, "Error::User not found\n\n", SIZE_BUFFER);
+        return;
+    }
+    bool alreadyExist = false;
 
+    FILE *fp = getTable("config", "permissions", "r", "id,nama_table");
+    char db[DATA_BUFFER], input[DATA_BUFFER];
+    sprintf(input, "%d,%s", target_id, db_name);
+    while (fscanf(fp, "%s", db) != EOF) {
+        if (strcmp(input, db) == 0) {
+            alreadyExist = true;
+            break;
+        }
+    }
+    fclose(fp);
+
+    if (alreadyExist) {
+        write(fd, "Info::User already authorized\n\n", SIZE_BUFFER);
+    } else {
+        FILE *fp = getTable("config", "permissions", "a", "id,nama_table");
+        fprintf(fp, "%d,%s\n", target_id, db_name);
+        fclose(fp);
+        write(fd, "Permission added\n\n", SIZE_BUFFER);
+    }
+}
+
+void useDB(int fd, char *db_name)
+{
+    if (!dirExist(fd, db_name)) {
+        return;
+    }
+    DIR *dp = opendir(db_name);
     bool authorized = false;
+
     if (curr_id != 0) {
         FILE *fp = getTable("config", "permissions", "r", "id,nama_table");
         char db[DATA_BUFFER], input[DATA_BUFFER];
         sprintf(input, "%d,%s", curr_id, db_name);
-
         while (fscanf(fp, "%s", db) != EOF) {
             if (strcmp(input, db) == 0) {
                 authorized = true;
@@ -181,6 +221,17 @@ bool login(int fd, char *username, char *password)
 }
 
 /*****  HELPER  *****/
+bool dirExist(int fd, char *db_name)
+{
+    struct stat s;
+    int err = stat(db_name, &s);
+    if (err == -1 || !S_ISDIR(s.st_mode)) {
+        write(fd, "Error::Database not found\n\n", SIZE_BUFFER);
+        return false;
+    }
+    return true;
+}
+
 int getUserId(char *username, char *password)
 {
     int id = -1;
@@ -188,10 +239,18 @@ int getUserId(char *username, char *password)
 
     if (fp != NULL) {
         char db[DATA_BUFFER], input[DATA_BUFFER];
-        sprintf(input, "%s,%s", username, password);
-
+        if (password != NULL) {
+            sprintf(input, "%s,%s", username, password);
+        } else {
+            sprintf(input, "%s", username);
+        }
+        
         while (fscanf(fp, "%s", db) != EOF) {
             char *temp = strstr(db, ",") + 1; // Get username and password from db
+            
+            if (password == NULL) {
+                temp = strtok(temp, ",");
+            }
             if (strcmp(temp, input) == 0) {
                 id = atoi(strtok(db, ","));  // Get id from db
                 break;
@@ -237,10 +296,10 @@ void parseQuery(char query[], char storage[20][DATA_BUFFER])
     }
 }
 
-FILE *getTable(char *db, char *table, char *cmd, char *collumns)
+FILE *getTable(char *db_name, char *table, char *cmd, char *collumns)
 {
     char path[DATA_BUFFER];
-    sprintf(path, "./%s/%s.csv", db, table);
+    sprintf(path, "./%s/%s.csv", db_name, table);
 
     if (access(path, F_OK) != 0 && collumns != NULL) {
         FILE *fp = fopen(path, "w");

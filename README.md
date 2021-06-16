@@ -86,9 +86,13 @@
 1. Pastikan pengguna yang menggunakan perintah ini adalah root.
    * Jika tidak, tampilkan tulisan **Error::Forbidden action**.
 2. Dapatkan nama database dan nama user.
-3. Dapatkan id dari nama user pada tabel **users**.
-4. Cek tabel **permissions**.
-   1. Jika id dan nama database ada pada tabel tersebut, tampilkan tulisan **Info::User already authorized** pada client.
+2. Pastikan folder database ada pada server.
+   * Jika tidak ada, tampilkan tulisan **Error::Database not found** pada client.
+   * Jika ada, lakukan langkah selanjutnya.
+4. Dapatkan id target dari nama user pada tabel **users**.
+   * Jika user tidak ada pada db, tampilkan tulisan **Error::User not found** pada client.
+5. Cek tabel **permissions**.
+   1. Jika id target dan nama database ada pada tabel tersebut, tampilkan tulisan **Info::User already authorized** pada client.
    2. Jika tidak, lakukan langkah berikutnya.
-5. Masukan id dan nama database ke tabel **permissions** dengan format `<user id>,<nama database>`.
-6. Pada client, tampilkan tulisan **Permission added**.
+6. Masukan id dan nama database ke tabel **permissions** dengan format `<user id>,<nama database>`.
+7. Pada client, tampilkan tulisan **Permission added**.
