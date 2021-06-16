@@ -64,7 +64,7 @@
 * User hanya bisa mengakses database yang diizinkan.
 * Root bisa akses semua database, termasuk db **config**.
 * Root bisa memberikan izin akses untuk user dengan format `GRANT PERMISSION <nama_database> INTO <nama_user>;`
-* Untuk menggunakan database, tuliskan perintah `USE <nama_database>`.
+* Untuk menggunakan database, tuliskan perintah `USE <nama_database>;`.
 
 ## Penyelesaian
 * Buat tabel **permissions** di db **config** dengan kolom `id,nama_table` yang menyimpan tabel beserta id milik user yang dapat mengaksesnya.
@@ -96,3 +96,25 @@
    2. Jika tidak, lakukan langkah berikutnya.
 6. Masukan id dan nama database ke tabel **permissions** dengan format `<user id>,<nama database>`.
 7. Pada client, tampilkan tulisan **Permission added**.
+
+
+# Data Definition Language (DDL)
+## Penjelasan
+* Input hanya berupa angka dan huruf.
+* User yang membuat database otomatis memiliki permission untuk database tersebut.
+* Perintah untuk membuat database adalah: `CREATE DATABASE <nama database>;`.
+* Jika root dan user dapat mengakses database, maka dia juga dapat:
+   1. Membuat tabel untuk database tersebut.
+      * Perintah untuk membuat tabel adalah: `CREATE TABLE <nama tabel> (<nama kolom> <tipe data>, ...);`
+      * Contoh: `CREATE TABLE table1 (kolom1 string, kolom2 int, kolom3 string, kolom4 int);`
+   2. Menghapus (drop) database, tabel, dan kolom.
+      * Perintah untuk meng-drop adalah: `DROP <DATABASE | TABLE | COLUMN> <nama_database | nama_tabel | <nama_kolom> FROM <nama_tabel>;`
+      * Contoh: 
+         ```
+         DROP DATABASE database1;
+         DROP TABLE table1;
+         DROP COLUMN kolom1 FROM table1;
+         ```
+
+### Penyelesaian
+

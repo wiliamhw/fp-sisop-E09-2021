@@ -15,11 +15,9 @@
 int curr_fd = -1;
 int curr_id = -1;
 char curr_db[DATA_BUFFER] = {0};
-const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 
+const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
-const char *USERS_TABLE = "./config/users,csv";
-const char *PERMISSIONS_TABLE = "./config/permissions";
 
 // Socket setup
 int create_tcp_server_socket();
@@ -108,7 +106,7 @@ void *routes(void *argv)
 /****   Controllers   *****/
 void grantDB(int fd, char *db_name, char *username)
 {
-    if (curr_id != 0) {
+    if (curr_id != 0 || strcmp(db_name, "config") == 0) {
         write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
         return;
     }
