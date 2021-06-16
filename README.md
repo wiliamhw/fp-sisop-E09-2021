@@ -68,6 +68,7 @@
 
 ## Penyelesaian
 * Buat tabel **permissions** di db **config** dengan kolom `id,nama_table` yang menyimpan tabel beserta id milik user yang dapat mengaksesnya.
+* Tambahkan perintah *grant permission* dan *use* pada fungsi `routes`.
 
 ### Fitur Akses Database
 1. Dapatkan id dari user saat ini dan nama database yang ingin diakses.

@@ -9,11 +9,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define DATA_BUFFER 300
+#define DATA_BUFFER 200
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 char username[DATA_BUFFER] = {0};
-char *type = NULL;
+char type[DATA_BUFFER] = {0};
 bool wait = false;
 
 // SETUP
@@ -56,7 +56,7 @@ bool login(int fd, int argc, char *argv[])
         puts("LOGIN root root");
 
         strcpy(username, "root");
-        type = "root";
+        strcpy(type, "root");
     } 
     else if (argc == 5
         && strcmp(argv[1] , "-u") == 0
@@ -67,7 +67,7 @@ bool login(int fd, int argc, char *argv[])
         puts(buf);
 
         strcpy(username, argv[2]);
-        type = "user";
+        strcpy(type, "user");
     } 
     else {
         puts("Error::Invalid argument");
@@ -109,7 +109,7 @@ void *handleInput(void *client_fd)
 
     while (1) {
         if (wait) continue;
-        printf("%s@%s: ", type, username);
+        printf("%s@%s: ", username, type);
         fgets(message, DATA_BUFFER, stdin);
 
         // Remove trailing \n
@@ -118,9 +118,9 @@ void *handleInput(void *client_fd)
             strcpy(message, tmp);
         }
 
-        if (isValid(message)) {
+        // if (isValid(message)) {
             send(fd, message, SIZE_BUFFER, 0);
-        }
+        // }
         wait = true;
     }
 }
@@ -133,7 +133,13 @@ void *handleOutput(void *client_fd)
     while (1) {
         memset(message, 0, SIZE_BUFFER);
         getServerOutput(fd, message);
-        printf("%s", message);
+        if (strcmp(message, "change type") == 0) {
+            getServerOutput(fd, message);
+            strcpy(type, message);
+        } 
+        else {
+            printf("%s", message);
+        }
         fflush(stdout);
         wait = false;
     }
