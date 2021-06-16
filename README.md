@@ -1,7 +1,7 @@
 # Info
 * Server hanya dapat menerima satu user yang sedang login.
 * Semua tabel memiliki ekstensi `.csv`.
-* Query tidak boleh melebihi 20 kata.
+<br><br>
 
 # Setup
 1. Buat program server-client multi koneksi berdasarkan pengerjaan dari modul 2 no.1.
@@ -15,7 +15,7 @@
 5. Untuk mematikan server Daemon, lakukan langkah berikut:
    1. Cari pid dari server dengan perintah `ps -aux | grep "server"`.
    2. Kill server dengan perintah `sudo kill -9 <pid>`.
-
+<br><br>
 
 # Autentikasi
 ## Penjelasan
@@ -57,7 +57,7 @@
 5. Masukan username, password, beserta id ke tabel **users**.
    * Format: `id,username,password`
 6. Tampilkan tulisan **Register success** ke client.
-
+<br><br>
 
 # Authorisasi
 ## Penjelasan
@@ -96,7 +96,7 @@
    2. Jika tidak, lakukan langkah berikutnya.
 6. Masukan id dan nama database ke tabel **permissions** dengan format `<user id>,<nama database>`.
 7. Pada client, tampilkan tulisan **Permission added**.
-
+<br><br>
 
 # Data Definition Language (DDL)
 ## Penjelasan
