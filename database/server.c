@@ -16,7 +16,7 @@
 
 int curr_fd = -1;
 int curr_id = -1;
-char curr_db[DATA_BUFFER] = {0};
+char curr_db[SMALL] = {0};
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
@@ -34,6 +34,7 @@ void grantDB(int fd, char *db_name, char *username);
 void createDB(int fd, char *db_name);
 void createTable(int fd, char parsed[20][SMALL]);
 void dropDB(int fd, char *db_name);
+void dropTable(int fd, char *table);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -82,7 +83,7 @@ void *routes(void *argv)
     char parsed[20][SMALL];
 
     while (read(fd, query, DATA_BUFFER) != 0) {
-        puts(query);
+        puts(query); // TODO::Comment on final
         explode(query, parsed, " ");
 
         if (strcmp(parsed[0], "LOGIN") == 0) {
@@ -105,6 +106,9 @@ void *routes(void *argv)
             if (strcmp(parsed[1], "DATABASE") == 0) {
                 dropDB(fd, parsed[2]);
             }
+            else if (strcmp(parsed[1], "TABLE") == 0) {
+                dropTable(fd, parsed[2]);
+            }
             else write(fd, "Invalid query on DROP command\n\n", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "USE") == 0) {
@@ -125,6 +129,20 @@ void *routes(void *argv)
 
 
 /****   Controllers   *****/
+void dropTable(int fd, char *table)
+{
+    if (curr_db[0] == '\0') {
+        write(fd, "No database used\n\n", SIZE_BUFFER);
+        return;
+    }
+    if (tableExist(fd, curr_db, table, true)) {
+        char path[DATA_BUFFER];
+        sprintf(path, "./%s/%s.csv", curr_db, table);
+        remove(path);
+        write(fd, "Table dropped\n\n", SIZE_BUFFER);
+    }
+}
+
 void dropDB(int fd, char *db_name)
 {
     if (strcmp(db_name, "config") == 0) {
@@ -368,8 +386,8 @@ bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool 
 
     // Swap file
     char path[DATA_BUFFER], new_path[DATA_BUFFER];
-    sprintf(path, "%s/%s.csv", db_used, table);
-    sprintf(new_path, "%s/%s.csv", db_used, new_table);
+    sprintf(path, "./%s/%s.csv", db_used, table);
+    sprintf(new_path, "./%s/%s.csv", db_used, new_table);
     remove(path);
     rename(new_path, path);
     return true;
@@ -442,14 +460,15 @@ bool dbExist(int fd, char *db_name, bool printError)
 
 bool tableExist(int fd, char *db_name, char *table, bool printError)
 {
-    FILE *fp = getTable(db_name, table, "a", NULL);
-    bool exist = (fp != NULL);
-    if (printError && !exist) {
-        write(fd, "Error::Table not found\n\n", SIZE_BUFFER);
-    } else {
-        fclose(fp);
+    struct stat s;
+    char path[DATA_BUFFER];
+    sprintf(path, "./%s/%s.csv", db_name, table);
+    int err = stat(path, &s);
+    if (err == -1 || !S_ISREG(s.st_mode)) {
+        if (printError && fd != -1) write(fd, "Error::Table not found\n\n", SIZE_BUFFER);
+        return false;
     }
-    return exist;
+    return true;
 }
 
 int getUserId(char *username, char *password)
@@ -522,8 +541,10 @@ FILE *getTable(char *db_name, char *table, char *cmd, char *collumns)
 {
     char path[DATA_BUFFER];
     sprintf(path, "./%s/%s.csv", db_name, table);
-
-    if (access(path, F_OK) != 0 && collumns != NULL) {
+    if (!tableExist(-1, db_name, table, false)) {
+        if (collumns == NULL) {
+            return NULL;
+        }
         FILE *fp = fopen(path, "w");
         fprintf(fp, "%s\n", collumns);
         fclose(fp);

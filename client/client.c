@@ -125,7 +125,7 @@ void *handleInput(void *client_fd)
             exit(EXIT_SUCCESS);
         }
         
-        // if (isValid(message)) {
+        // if (isValid(message)) { // TODO::Uncomment on final
             send(fd, message, SIZE_BUFFER, 0);
         // }
         wait = true;
