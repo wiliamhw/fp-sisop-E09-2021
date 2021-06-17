@@ -30,6 +30,7 @@ void regist(int fd, char *username, char *password);
 void useDB(int fd, char *db_name);
 void grantDB(int fd, char *db_name, char *username);
 void createDB(int fd, char *db_name);
+void createTable(int fd, char parsed[20][DATA_BUFFER]);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -82,13 +83,13 @@ void *routes(void *argv)
         }
         else if (strcmp(parsed[0], "CREATE") == 0) {
             if (strcmp(parsed[1], "USER") == 0) {
-                if (curr_id == 0) {
-                    regist(fd, parsed[2], parsed[5]);
-                } 
-                else write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
+                regist(fd, parsed[2], parsed[5]);
             }
             else if (strcmp(parsed[1], "DATABASE") == 0) {
                 createDB(fd, parsed[2]);
+            }
+            else if (strcmp(parsed[1], "TABLE") == 0) {
+                createTable(fd, parsed);
             }
             else write(fd, "Invalid query on CREATE command\n\n", SIZE_BUFFER);
         }
@@ -109,6 +110,38 @@ void *routes(void *argv)
 }
 
 /****   Controllers   *****/
+void createTable(int fd, char parsed[20][DATA_BUFFER])
+{
+    if (strlen(curr_db) == 0) {
+        write(fd, "Error::No database used\n\n", SIZE_BUFFER);
+        return;
+    }
+    char *table = parsed[2];
+
+    // Make sure that table doesn't exist in the current database
+    FILE *fp = getTable(curr_db, table, "r", NULL);
+    if (fp != NULL) {
+        fclose(fp);
+        write(fd, "Error::Table already exists\n\n", SIZE_BUFFER);
+        return;
+    }
+
+    // Get collumns
+    char cols[DATA_BUFFER];
+    strcpy(cols, parsed[3] + 1);
+    for (int i = 5; i < 20; i+=2) {
+        if (strlen(parsed[i]) == 0) {
+            break;
+        }
+        strcat(cols, ",");
+        strcat(cols, parsed[i]);
+    }
+
+    fp = getTable(curr_db, table, "a", cols);
+    fclose(fp);
+    write(fd, "Table created\n\n", SIZE_BUFFER);
+}
+
 void createDB(int fd, char *db_name)
 {
     if (dbExist(fd, db_name, false)) {
@@ -202,6 +235,11 @@ void useDB(int fd, char *db_name)
 
 void regist(int fd, char *username, char *password)
 {
+    if (curr_id != 0) {
+        write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
+        return;
+    }
+
     FILE *fp = getTable("config", "users", "a", "id,username,password");
     int id = getUserId(username, password);
 

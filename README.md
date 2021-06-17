@@ -130,10 +130,11 @@
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan nama tabel beserta kolom-kolomnya dari client dan kirim ke server.
-   * Dari perintah: `CREATE TABLE <nama tabel> (<nama kolom> <tipe data>, ...);`
+   * Dari perintah: `CREATE TABLE <nama tabel> (<nama_kolom> <tipe_data>, ...);`
 3. Pastikan tabel yang akan dibuat belum ada di database yang sedang digunakan pada server.
    * Jika sudah ada, tampilkan **Error::Table already exists**.
 4. Buat tabel baru pada database yang saat ini sedang digunakan.
+5. Tampilkan **Table created** pada client.
 
 ### Fitur Drop
 #### Fitur Drop Database
