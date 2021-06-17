@@ -30,11 +30,12 @@ void regist(int fd, char *username, char *password);
 void useDB(int fd, char *db_name);
 void grantDB(int fd, char *db_name, char *username);
 
-// Helper
+// Services
 int getInput(int fd, char *prompt, char *storage);
 int getUserId(char *username, char *password);
 int getLastId(char *db_name, char *table);
-void parseQuery(char *query, char storage[20][DATA_BUFFER]);
+void explode(char *string, char storage[20][DATA_BUFFER], const char *delimiter);
+void changeCurrDB(int fd, const char *db_name);
 FILE *getTable(char *db_name, char *table, char *cmd, char *collumns);
 bool dirExist(int fd, char *db_name);
 
@@ -72,7 +73,7 @@ void *routes(void *argv)
 
     while (read(fd, query, DATA_BUFFER) != 0) {
         puts(query);
-        parseQuery(query, parsed);
+        explode(query, parsed, " ");
 
         if (strcmp(parsed[0], "LOGIN") == 0) {
             if (!login(fd, parsed[1], parsed[2]))
@@ -165,11 +166,8 @@ void useDB(int fd, char *db_name)
     }
 
     if (authorized) {
-        strcpy(curr_db, db_name);
-        write(fd, "change type", SIZE_BUFFER);
-        write(fd, db_name, SIZE_BUFFER);
-    } 
-    else {
+        changeCurrDB(fd, db_name);
+    } else {
         write(fd, "Error::Unauthorized access\n\n", SIZE_BUFFER);
     }
 }
@@ -218,7 +216,14 @@ bool login(int fd, char *username, char *password)
     return true;
 }
 
-/*****  HELPER  *****/
+/*****  SERVICES  *****/
+void changeCurrDB(int fd, const char *db_name)
+{
+    strcpy(curr_db, db_name);
+    write(fd, "change type", SIZE_BUFFER);
+    write(fd, db_name, SIZE_BUFFER);
+}
+
 bool dirExist(int fd, char *db_name)
 {
     struct stat s;
@@ -273,14 +278,14 @@ int getLastId(char *db_name, char *table)
     return id;
 }
 
-void parseQuery(char query[], char storage[20][DATA_BUFFER])
+void explode(char string[], char storage[20][DATA_BUFFER], const char *delimiter)
 {
-    char *buf = query;
+    char *buf = string;
     char *temp = NULL;
     memset(storage, '\0', sizeof(char) * 20 * DATA_BUFFER);
 
     int i = 0;
-    while ((temp = strtok(buf, " ")) != NULL && i < 20) {
+    while ((temp = strtok(buf, delimiter)) != NULL && i < 20) {
         if (buf != NULL) {
             buf = NULL;
         }
@@ -288,7 +293,7 @@ void parseQuery(char query[], char storage[20][DATA_BUFFER])
     }
 
     // Remove ";""
-    char *ptr = strstr(storage[--i], ";");
+    char *ptr = strchr(storage[--i], ';');
     if (ptr != NULL) {
         *ptr = '\0';
     }
