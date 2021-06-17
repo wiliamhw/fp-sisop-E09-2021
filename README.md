@@ -1,6 +1,8 @@
 # Info
 * Server hanya dapat menerima satu user yang sedang login.
 * Semua tabel memiliki ekstensi `.csv`.
+* Panjang query maksimal 20 kata.
+* Panjang kata dalam query maksimal 40 karakter.
 <br><br>
 
 # Setup
@@ -140,7 +142,7 @@
 #### Fungsi Delete Table
 1. Buat fungsi `bool deleteTable(fd, <db_name>, <table>, <column>, <value>, printSuccess)`.
    * `fd` adalah file descriptor milik socket client.
-   * `printSuccess` adalah booelean yang menandakan apakah success message pada fungsi ini akan ditampilkan kepada client atau tidak.
+   * `printSuccess` adalah boolean yang menandakan apakah success message pada fungsi ini akan ditampilkan kepada client atau tidak.
    * Fungsi ini akan mereturn `true` bila sukses dan `false` bila terjadi error.
 2. `db_used = (<db_name> != NULL) ? db_name : curr_db`.
 3. Pastikan `db_used` tidak NULL.
@@ -153,9 +155,10 @@
 6. Jika jenisnya adalah **hapus tabel**:
    1. Hapus semua baris pada tabel dengan menggunakan `fopen(<table>, "w")`.
    2. Jika `printSuccess == true`, tampilkan **Table deleted** pada client.
+   3. Return true
 7. Selain itu, lakukan langkah dibawah ini.
-8.  Dapatkan baris pertama pada `table`.
-9.  Pecah baris pertama tersebut per-kata dan simpan di dalam sebuah array.
+8. Dapatkan baris pertama pada `table`.
+9. Pecah baris pertama tersebut per-kata dan simpan di dalam sebuah array.
 10. Dapatkan index `<column>` pada array di langkah sebelum ini. 
    * Jika tidak ada, tampilkan **Error::Collumn not found** pada client dan return `false`.
 11. Buat tabel baru pada DB yang sedang diakses dengan nama `new-<table>`.
@@ -169,13 +172,12 @@
       3. Print `\n` pada `new-<table>` untuk menandakan pergantian baris.
    2. Jika `printSuccess == true`, tampilkan **Collumn dropped** pada client.
 13. Jika jenis delete adalah **hapus baris tertentu**:
-   3. Initialisasi sebuah counter yang menyimpan banyak baris yang terhapus dengan 0.
-   4. Untuk masing-masing baris pada `<tabel>`:
+   1. Initialisasi sebuah counter yang menyimpan banyak baris yang terhapus dengan 0.
+   2. Untuk masing-masing baris pada `<tabel>`:
       1. Pecah baris tersebut per-kata dan simpan di dalam sebuah array.
       2. Jika baris tersebut pada index `<column>` tidak bernilai `<value>`, copy baris tersebut ke `new-<table>`.
       3. Jika tidak, increment counter baris yang terhapus.
-      4. Print `\n` pada `new-<table>` untuk menandakan pergantian baris.
-   5. Jika `printSuccess == true`, tampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
+   3. Jika `printSuccess == true`, tampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
 14. Hapus `<table>` dan ubah nama `new-<table>` menjadi `<table>`.
 15. Return true;
 

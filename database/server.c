@@ -11,7 +11,8 @@
 #include <netinet/in.h>
 #include <ftw.h>
 
-#define DATA_BUFFER 200
+#define DATA_BUFFER 150
+#define SMALL 40
 
 int curr_fd = -1;
 int curr_id = -1;
@@ -31,14 +32,14 @@ void regist(int fd, char *username, char *password);
 void useDB(int fd, char *db_name);
 void grantDB(int fd, char *db_name, char *username);
 void createDB(int fd, char *db_name);
-void createTable(int fd, char parsed[20][DATA_BUFFER]);
+void createTable(int fd, char parsed[20][SMALL]);
 void dropDB(int fd, char *db_name);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
 int getUserId(char *username, char *password);
 int getLastId(char *db_name, char *table);
-void explode(char *string, char storage[20][DATA_BUFFER], const char *delimiter);
+void explode(char *string, char storage[20][SMALL], const char *delimiter);
 void changeCurrDB(int fd, const char *db_name);
 FILE *getTable(char *db_name, char *table, char *cmd, char *collumns);
 bool dbExist(int fd, char *db_name, bool printError);
@@ -46,6 +47,7 @@ bool tableExist(int fd, char *db_name, char *table, bool printError);
 bool canAccessDB(int fd, int user_id, char *db_name, bool printError);
 int deleteDB(char *db_name);
 int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
+bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess);
 
 int main()
 {
@@ -77,7 +79,7 @@ void *routes(void *argv)
     chdir(currDir); // TODO:: comment on final
     int fd = *(int *) argv;
     char query[DATA_BUFFER], buf[DATA_BUFFER];
-    char parsed[20][DATA_BUFFER];
+    char parsed[20][SMALL];
 
     while (read(fd, query, DATA_BUFFER) != 0) {
         puts(query);
@@ -103,6 +105,7 @@ void *routes(void *argv)
             if (strcmp(parsed[1], "DATABASE") == 0) {
                 dropDB(fd, parsed[2]);
             }
+            else write(fd, "Invalid query on DROP command\n\n", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "USE") == 0) {
             useDB(fd, parsed[1]);
@@ -135,15 +138,15 @@ void dropDB(int fd, char *db_name)
         write(fd, "Error:Unknown error occured when deleting database\n\n", SIZE_BUFFER);
         return;
     }
-    // deleteTable("permissions", "db_name", db_name);
     if (strcmp(curr_db, db_name) == 0) {
         write(fd, "Wait", SIZE_BUFFER);
         changeCurrDB(fd, NULL);
     }
-    write(fd, "Database dropped\n\n", SIZE_BUFFER);
+    bool isDeleted = deleteTable(fd, "config", "permissions", "db_name", db_name, false);
+    if (isDeleted) write(fd, "Database dropped\n\n", SIZE_BUFFER);
 }
 
-void createTable(int fd, char parsed[20][DATA_BUFFER])
+void createTable(int fd, char parsed[20][SMALL])
 {
     if (strlen(curr_db) == 0) {
         write(fd, "Error::No database used\n\n", SIZE_BUFFER);
@@ -177,20 +180,22 @@ void createDB(int fd, char *db_name)
 {
     if (dbExist(fd, db_name, false)) {
         write(fd, "Error::Database already exists\n\n", SIZE_BUFFER);
-        return;
     }
-    if (mkdir(db_name, 0777) == -1) {
+    else if (strstr(db_name, "new-") == db_name) { // Can't make dir that start with prefix "new-""
+        write(fd, "Error::Cannot create database with prefix \"new-\"\n\n", SIZE_BUFFER);
+    }
+    else if (mkdir(db_name, 0777) == -1) {
         write(fd, 
             "Error::Unknown error occurred when creating new database\n\n", 
             SIZE_BUFFER);
-        return;
+    } else {
+        if (curr_id != 0) {
+            FILE *fp = getTable("config", "permissions", "a", "id,db_name");
+            fprintf(fp, "%d,%s\n", curr_id, db_name);
+            fclose(fp);
+        }
+        write(fd, "Database created\n\n", SIZE_BUFFER);
     }
-    if (curr_id != 0) {
-        FILE *fp = getTable("config", "permissions", "a", "id,db_name");
-        fprintf(fp, "%d,%s\n", curr_id, db_name);
-        fclose(fp);
-    }
-    write(fd, "Database created\n\n", SIZE_BUFFER);
 }
 
 void grantDB(int fd, char *db_name, char *username)
@@ -283,6 +288,93 @@ bool login(int fd, char *username, char *password)
 }
 
 /*****  SERVICES  *****/
+bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
+{
+    char db_used[SMALL];
+    if (db_name != NULL) {
+        strcpy(db_used, db_name);
+    } else if (curr_db != NULL) {
+        strcpy(db_used, curr_db);
+    } else {
+        write(fd, "Error::No database specified on delete\n\n", SIZE_BUFFER);
+        return false;
+    }
+    
+    // Delete table
+    if (col == NULL && val == NULL) {
+        FILE *fp = getTable(db_used, table, "w", NULL);
+        fclose(fp);
+        if (printSuccess) write(fd, "Table deleted\n\n", SIZE_BUFFER);
+        return true;
+    }
+
+    // Get col index in db
+    int col_index = -1;
+    int last_index = -1;
+    char db[DATA_BUFFER], parsed[20][SMALL];
+    FILE *fp = getTable(db_used, table, "r", NULL);
+    fscanf(fp, "%s", db);
+    rewind(fp);
+    explode(db, parsed, ",");
+    for (int i = 0; i < 20; i++) {
+        if (parsed[i][0] == '\0') {
+            last_index = --i;
+            break;
+        }
+        if (strcmp(parsed[i], col) == 0) {
+            col_index = i;
+        }
+    }
+    if (col_index == -1 || last_index == -1) {
+        write(fd, "Error::Collumn not found or schema isn't defined\n\n", SIZE_BUFFER);
+        return false;
+    }
+
+    char new_table[SMALL];
+    sprintf(new_table, "new-%s", table);
+    FILE *new_fp = getTable(db_used, new_table, "w", NULL);
+
+    // Delete collumn
+    if (val == NULL) { 
+        while (fscanf(fp, "%s", db) != EOF) {
+            explode(db, parsed, ",");
+            for (int i = 0; i <= last_index; i++) {
+                if (i != col_index) {
+                    fprintf(new_fp, "%s", parsed[i]);
+                    if (i != last_index) fprintf(new_fp, ",");
+                }
+            }
+            fprintf(new_fp, "\n");
+        }
+        if (printSuccess) write(fd, "Collumn dropped\n\n", SIZE_BUFFER);
+    }
+    else { // Delete specific collumn
+        int counter  = 0;
+        while (fscanf(fp, "%s", db) != EOF) {
+            explode(db, parsed, ",");
+            if (strcmp(val, parsed[col_index]) != 0) {
+                fprintf(new_fp, "%s\n", db);
+            } else {
+                counter++;
+            }
+        }
+        if (printSuccess) {
+            sprintf(db, "Delete success, %d row has been deleted\n\n", counter);
+            write(fd, db, SIZE_BUFFER);
+        }
+    }
+    fclose(new_fp);
+    fclose(fp);
+
+    // Swap file
+    char path[DATA_BUFFER], new_path[DATA_BUFFER];
+    sprintf(path, "%s/%s.csv", db_used, table);
+    sprintf(new_path, "%s/%s.csv", db_used, new_table);
+    remove(path);
+    rename(new_path, path);
+    return true;
+}
+
 int deleteDB(char *db_name)
 {
     return nftw(db_name, _deleteDB, 64, FTW_DEPTH | FTW_PHYS);
@@ -318,7 +410,7 @@ bool canAccessDB(int fd, int user_id, char *db_name, bool printError)
     } else {
         authorized = true;
     }
-    if (!authorized) {
+    if (!authorized && printError) {
         write(fd, "Error::Unauthorized access\n\n", SIZE_BUFFER);
     }
     return authorized;
@@ -403,11 +495,13 @@ int getLastId(char *db_name, char *table)
     return id;
 }
 
-void explode(char string[], char storage[20][DATA_BUFFER], const char *delimiter)
+void explode(char string[], char storage[20][SMALL], const char *delimiter)
 {
-    char *buf = string;
+    char _buf[DATA_BUFFER];
+    strcpy(_buf, string);
+    char *buf = _buf;
     char *temp = NULL;
-    memset(storage, '\0', sizeof(char) * 20 * DATA_BUFFER);
+    memset(storage, '\0', sizeof(char) * 20 * SMALL);
 
     int i = 0;
     while ((temp = strtok(buf, delimiter)) != NULL && i < 20) {
@@ -436,7 +530,6 @@ FILE *getTable(char *db_name, char *table, char *cmd, char *collumns)
     }
     return fopen(path, cmd);
 }
-
 
 /****   SOCKET SETUP    *****/
 int create_tcp_server_socket()

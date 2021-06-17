@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define DATA_BUFFER 200
+#define DATA_BUFFER 150
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 char username[DATA_BUFFER] = {0};
@@ -53,7 +53,7 @@ bool login(int fd, int argc, char *argv[])
     char buf[DATA_BUFFER];
     if (geteuid() == 0) { // root
         write(fd, "LOGIN root root", SIZE_BUFFER);
-        puts("LOGIN root root");
+        // puts("LOGIN root root"); // TODO:: Delete on final
 
         strcpy(username, "root");
         strcpy(type, "root");
@@ -64,7 +64,7 @@ bool login(int fd, int argc, char *argv[])
     ) { // user
         sprintf(buf, "LOGIN %s %s", argv[2], argv[4]);
         write(fd, buf, SIZE_BUFFER);
-        puts(buf);
+        // puts(buf); // TODO:: Delete on final
 
         strcpy(username, argv[2]);
         strcpy(type, "user");
@@ -108,7 +108,10 @@ void *handleInput(void *client_fd)
     char message[DATA_BUFFER] = {0};
 
     while (1) {
-        if (wait) continue;
+        if (wait) {
+            sleep(2); //TODO::Comment on final
+            continue;
+        };
         printf("%s@%s: ", username, type);
         fgets(message, DATA_BUFFER, stdin);
 
