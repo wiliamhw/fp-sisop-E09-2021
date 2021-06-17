@@ -35,6 +35,7 @@ void createDB(int fd, char *db_name);
 void createTable(int fd, char parsed[20][SMALL]);
 void dropDB(int fd, char *db_name);
 void dropTable(int fd, char *table);
+void dropColumn(int fd, char *col, char *table);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -109,6 +110,9 @@ void *routes(void *argv)
             else if (strcmp(parsed[1], "TABLE") == 0) {
                 dropTable(fd, parsed[2]);
             }
+            else if (strcmp(parsed[1], "COLUMN") == 0) {
+                dropColumn(fd, parsed[2], parsed[4]);
+            }
             else write(fd, "Invalid query on DROP command\n\n", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "USE") == 0) {
@@ -129,6 +133,20 @@ void *routes(void *argv)
 
 
 /****   Controllers   *****/
+void dropColumn(int fd, char *col, char *table)
+{
+    if (curr_db[0] == '\0') {
+        write(fd, "Error::No database used\n\n", SIZE_BUFFER);
+        return;
+    }
+    if (tableExist(fd, curr_db, table, true)) {
+        bool isDeleted = deleteTable(fd, curr_db, table, col, NULL, false);
+        if (isDeleted) {
+            write(fd, "Column dropped\n\n", SIZE_BUFFER);
+        }
+    }
+}
+
 void dropTable(int fd, char *table)
 {
     if (curr_db[0] == '\0') {
@@ -208,7 +226,11 @@ void createDB(int fd, char *db_name)
             SIZE_BUFFER);
     } else {
         if (curr_id != 0) {
-            FILE *fp = getTable("config", "permissions", "a", "id,db_name");
+            char *cols = NULL;
+            if (!tableExist(fd, "config", "users", false)) {
+                cols = "id,username,password";
+            }
+            FILE *fp = getTable("config", "permissions", "a", cols);
             fprintf(fp, "%d,%s\n", curr_id, db_name);
             fclose(fp);
         }
@@ -231,8 +253,12 @@ void grantDB(int fd, char *db_name, char *username)
         return;
     }
     bool alreadyExist = false;
+    char *cols = NULL;
+    if (!tableExist(fd, "config", "users", false)) {
+        cols = "id,username,password";
+    }
 
-    FILE *fp = getTable("config", "permissions", "r", "id,db_name");
+    FILE *fp = getTable("config", "permissions", "r", cols);
     char db[DATA_BUFFER], input[DATA_BUFFER];
     sprintf(input, "%d,%s", target_id, db_name);
     while (fscanf(fp, "%s", db) != EOF) {
@@ -262,12 +288,15 @@ void useDB(int fd, char *db_name)
 
 void regist(int fd, char *username, char *password)
 {
+    char *cols = NULL;
     if (curr_id != 0) {
         write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
         return;
     }
-
-    FILE *fp = getTable("config", "users", "a", "id,username,password");
+    if (!tableExist(fd, "config", "users", false)) {
+        cols = "id,username,password";
+    }
+    FILE *fp = getTable("config", "users", "a", cols);
     int id = getUserId(username, password);
 
     if (id != -1) {
@@ -308,19 +337,14 @@ bool login(int fd, char *username, char *password)
 /*****  SERVICES  *****/
 bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
 {
-    char db_used[SMALL];
-    if (db_name != NULL) {
-        strcpy(db_used, db_name);
-    } else if (curr_db != NULL) {
-        strcpy(db_used, curr_db);
-    } else {
+    if (db_name == NULL) {
         write(fd, "Error::No database specified on delete\n\n", SIZE_BUFFER);
         return false;
     }
     
     // Delete table
     if (col == NULL && val == NULL) {
-        FILE *fp = getTable(db_used, table, "w", NULL);
+        FILE *fp = getTable(db_name, table, "w", NULL);
         fclose(fp);
         if (printSuccess) write(fd, "Table deleted\n\n", SIZE_BUFFER);
         return true;
@@ -330,7 +354,7 @@ bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool 
     int col_index = -1;
     int last_index = -1;
     char db[DATA_BUFFER], parsed[20][SMALL];
-    FILE *fp = getTable(db_used, table, "r", NULL);
+    FILE *fp = getTable(db_name, table, "r", NULL);
     fscanf(fp, "%s", db);
     rewind(fp);
     explode(db, parsed, ",");
@@ -350,7 +374,7 @@ bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool 
 
     char new_table[SMALL];
     sprintf(new_table, "new-%s", table);
-    FILE *new_fp = getTable(db_used, new_table, "w", NULL);
+    FILE *new_fp = getTable(db_name, new_table, "w", NULL);
 
     // Delete collumn
     if (val == NULL) { 
@@ -386,8 +410,8 @@ bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool 
 
     // Swap file
     char path[DATA_BUFFER], new_path[DATA_BUFFER];
-    sprintf(path, "./%s/%s.csv", db_used, table);
-    sprintf(new_path, "./%s/%s.csv", db_used, new_table);
+    sprintf(path, "./%s/%s.csv", db_name, table);
+    sprintf(new_path, "./%s/%s.csv", db_name, new_table);
     remove(path);
     rename(new_path, path);
     return true;
@@ -412,19 +436,17 @@ bool canAccessDB(int fd, int user_id, char *db_name, bool printError)
     }
 
     bool authorized = false;
-    if (user_id != 0) {
+    if (user_id != 0 && tableExist(fd, "config", "permissions", false)) {
         FILE *fp = getTable("config", "permissions", "r", NULL);
-        if (fp != NULL) {
-            char db[DATA_BUFFER], input[DATA_BUFFER];
-            sprintf(input, "%d,%s", user_id, db_name);
-            while (fscanf(fp, "%s", db) != EOF) {
-                if (strcmp(input, db) == 0) {
-                    authorized = true;
-                    break;
-                }
+        char db[DATA_BUFFER], input[DATA_BUFFER];
+        sprintf(input, "%d,%s", user_id, db_name);
+        while (fscanf(fp, "%s", db) != EOF) {
+            if (strcmp(input, db) == 0) {
+                authorized = true;
+                break;
             }
-            fclose(fp);
         }
+        fclose(fp);
     } else {
         authorized = true;
     }
@@ -474,9 +496,10 @@ bool tableExist(int fd, char *db_name, char *table, bool printError)
 int getUserId(char *username, char *password)
 {
     int id = -1;
-    FILE *fp = getTable("config", "users", "r", NULL);
 
-    if (fp != NULL) {
+    if (tableExist(-1, "config", "users", false)) {
+
+        FILE *fp = getTable("config", "users", "r", NULL);
         char db[DATA_BUFFER], input[DATA_BUFFER];
         if (password != NULL) {
             sprintf(input, "%s,%s", username, password);
@@ -503,13 +526,13 @@ int getUserId(char *username, char *password)
 int getLastId(char *db_name, char *table)
 {
     int id = 1;
-    FILE *fp = getTable(db_name, table, "r", NULL);
-
-    if (fp != NULL) {
+    if (tableExist(-1, db_name, table, false)) {
+        FILE *fp = getTable(db_name, table, "r", NULL);
         char db[DATA_BUFFER];
         while (fscanf(fp, "%s", db) != EOF) {
             id = atoi(strtok(db, ","));  // Get id from db
         }
+        fclose(fp);
     }
     return id;
 }
@@ -541,10 +564,7 @@ FILE *getTable(char *db_name, char *table, char *cmd, char *collumns)
 {
     char path[DATA_BUFFER];
     sprintf(path, "./%s/%s.csv", db_name, table);
-    if (!tableExist(-1, db_name, table, false)) {
-        if (collumns == NULL) {
-            return NULL;
-        }
+    if (collumns != NULL) {
         FILE *fp = fopen(path, "w");
         fprintf(fp, "%s\n", collumns);
         fclose(fp);

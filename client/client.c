@@ -109,7 +109,7 @@ void *handleInput(void *client_fd)
 
     while (1) {
         if (wait) {
-            sleep(2); //TODO::Comment on final
+            sleep(1); //TODO::Comment on final
             continue;
         };
         printf("%s@%s: ", username, type);
