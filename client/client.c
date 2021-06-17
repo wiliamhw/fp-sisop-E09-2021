@@ -117,7 +117,11 @@ void *handleInput(void *client_fd)
         if (tmp != NULL) {
             strcpy(message, tmp);
         }
-
+        if (strcasecmp(message, "quit") == 0) {
+            puts("Good bye :3");
+            exit(EXIT_SUCCESS);
+        }
+        
         // if (isValid(message)) {
             send(fd, message, SIZE_BUFFER, 0);
         // }

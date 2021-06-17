@@ -119,6 +119,7 @@
 ## Penyelesaian
 ### Fitur Create Database
 1. Dapatkan nama database yang akan dibuat dari client dan kirim ke server.
+   * Dari perintah: `CREATE DATABASE <nama database>;`
 2. Pastikan db yang akan dibuat belum ada di server.
    * Jika sudah ada, tampilkan **Error::Database already exists** pada client.
 3. Buat database baru dengan nama yang diberikan oleh client.
@@ -129,6 +130,7 @@
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan nama tabel beserta kolom-kolomnya dari client dan kirim ke server.
+   * Dari perintah: `CREATE TABLE <nama tabel> (<nama kolom> <tipe data>, ...);`
 3. Pastikan tabel yang akan dibuat belum ada di database yang sedang digunakan pada server.
    * Jika sudah ada, tampilkan **Error::Table already exists**.
 4. Buat tabel baru pada database yang saat ini sedang digunakan.
@@ -136,6 +138,7 @@
 ### Fitur Drop
 #### Fitur Drop Database
 1. Dapatkan database yang akan didrop dari client dan kirim ke server.
+   * Dari perintah: `DROP DATABASE <db_name>`
 2. Jika database yang akan di drop sedang digunakan:
    1. Kosongkan `curr_db` pada server.
    2. Ganti `type` pada client sesuai dengan tipe akun client.
@@ -145,9 +148,9 @@
 4. Pastikan client memiliki permissions pada database.
    * Jika tidak, tampilkan **Error::Unauthorized action**.
 5. Hapus database pada server.
-6. Pada tabel permissions, hapus semua baris dengan `nama_db == <nama database yang terhapus`.
+6. Pada tabel permissions, hapus semua baris dengan `db_name == <nama database yang terhapus`.
    1. Buat tabel baru bernama **new-permissions**.
-   2. Untuk masing-masing baris pada tabel **permissions**, jika `nama_db != <nama database yang terhapus`, copy baris tersebut ke tabel **new-permissions**.
+   2. Untuk masing-masing baris pada tabel **permissions**, jika `db_name != <nama database yang terhapus`, copy baris tersebut ke tabel **new-permissions**.
    3. Hapus tabel **permissions**.
    4. Ganti nama tabel **new-permissions** menjadi **permissions**.
 7. Tampilkan **Database dropped** pada client.
@@ -156,6 +159,7 @@
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan tabel yang akan didrop dari client dan kirim ke server.
+   * Dari perintah: `DROP TABLE <nama table>;`.
 3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
    * Jika tidak ada, tampilkan **Error::Table not found**.
 4. Hapus table dengan perintah `remove("<curr_db>/<nama table>")`.
@@ -166,6 +170,7 @@
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan nama kolom yang akan didrop beserta tabelnya dari client dan kirim ke server.
 3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
+   * Dari perintah: `DROP COLUMN <kolom> FROM <table>;`.
    * Jika tidak ada, tampilkan **Error::Table not found**.
 4. Hapus kolom pada tabel sesuai input.
    1. Buat tabel baru bernama `new-<table>`.

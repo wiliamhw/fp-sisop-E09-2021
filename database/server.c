@@ -29,6 +29,7 @@ bool login(int fd, char *username, char *password);
 void regist(int fd, char *username, char *password);
 void useDB(int fd, char *db_name);
 void grantDB(int fd, char *db_name, char *username);
+void createDB(int fd, char *db_name);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -37,7 +38,7 @@ int getLastId(char *db_name, char *table);
 void explode(char *string, char storage[20][DATA_BUFFER], const char *delimiter);
 void changeCurrDB(int fd, const char *db_name);
 FILE *getTable(char *db_name, char *table, char *cmd, char *collumns);
-bool dirExist(int fd, char *db_name);
+bool dbExist(int fd, char *db_name, bool printError);
 
 int main()
 {
@@ -86,6 +87,9 @@ void *routes(void *argv)
                 } 
                 else write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
             }
+            else if (strcmp(parsed[1], "DATABASE") == 0) {
+                createDB(fd, parsed[2]);
+            }
             else write(fd, "Invalid query on CREATE command\n\n", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "USE") == 0) {
@@ -105,13 +109,33 @@ void *routes(void *argv)
 }
 
 /****   Controllers   *****/
+void createDB(int fd, char *db_name)
+{
+    if (dbExist(fd, db_name, false)) {
+        write(fd, "Error::Database already exists\n\n", SIZE_BUFFER);
+        return;
+    }
+    if (mkdir(db_name, 0777) == -1) {
+        write(fd, 
+            "Error::Unknown error occurred when creating new database\n\n", 
+            SIZE_BUFFER);
+        return;
+    }
+    if (curr_id != 0) {
+        FILE *fp = getTable("config", "permissions", "a", "id,db_name");
+        fprintf(fp, "%d,%s\n", curr_id, db_name);
+        fclose(fp);
+    }
+    write(fd, "Database created\n\n", SIZE_BUFFER);
+}
+
 void grantDB(int fd, char *db_name, char *username)
 {
     if (curr_id != 0 || strcmp(db_name, "config") == 0) {
         write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
         return;
     }
-    if (!dirExist(fd, db_name)) {
+    if (!dbExist(fd, db_name, true)) {
         return;
     }
     int target_id = getUserId(username, NULL);
@@ -121,7 +145,7 @@ void grantDB(int fd, char *db_name, char *username)
     }
     bool alreadyExist = false;
 
-    FILE *fp = getTable("config", "permissions", "r", "id,nama_db");
+    FILE *fp = getTable("config", "permissions", "r", "id,db_name");
     char db[DATA_BUFFER], input[DATA_BUFFER];
     sprintf(input, "%d,%s", target_id, db_name);
     while (fscanf(fp, "%s", db) != EOF) {
@@ -135,7 +159,7 @@ void grantDB(int fd, char *db_name, char *username)
     if (alreadyExist) {
         write(fd, "Info::User already authorized\n\n", SIZE_BUFFER);
     } else {
-        FILE *fp = getTable("config", "permissions", "a", "id,nama_db");
+        FILE *fp = getTable("config", "permissions", "a", NULL);
         fprintf(fp, "%d,%s\n", target_id, db_name);
         fclose(fp);
         write(fd, "Permission added\n\n", SIZE_BUFFER);
@@ -144,23 +168,27 @@ void grantDB(int fd, char *db_name, char *username)
 
 void useDB(int fd, char *db_name)
 {
-    if (!dirExist(fd, db_name)) {
+    if (!dbExist(fd, db_name, true)) {
         return;
     }
     DIR *dp = opendir(db_name);
     bool authorized = false;
 
     if (curr_id != 0) {
-        FILE *fp = getTable("config", "permissions", "r", "id,nama_table");
-        char db[DATA_BUFFER], input[DATA_BUFFER];
-        sprintf(input, "%d,%s", curr_id, db_name);
-        while (fscanf(fp, "%s", db) != EOF) {
-            if (strcmp(input, db) == 0) {
-                authorized = true;
-                break;
+        FILE *fp = getTable("config", "permissions", "r", NULL);
+        if (fp != NULL) {
+            char db[DATA_BUFFER], input[DATA_BUFFER];
+            sprintf(input, "%d,%s", curr_id, db_name);
+            while (fscanf(fp, "%s", db) != EOF) {
+                if (strcmp(input, db) == 0) {
+                    authorized = true;
+                    break;
+                }
             }
-        }
-        fclose(fp);
+            fclose(fp);
+        } else {
+            authorized = false;
+        }  
     } else {
         authorized = true;
     }
@@ -224,12 +252,12 @@ void changeCurrDB(int fd, const char *db_name)
     write(fd, db_name, SIZE_BUFFER);
 }
 
-bool dirExist(int fd, char *db_name)
+bool dbExist(int fd, char *db_name, bool printError)
 {
     struct stat s;
     int err = stat(db_name, &s);
     if (err == -1 || !S_ISDIR(s.st_mode)) {
-        write(fd, "Error::Database not found\n\n", SIZE_BUFFER);
+        if (printError) write(fd, "Error::Database not found\n\n", SIZE_BUFFER);
         return false;
     }
     return true;
