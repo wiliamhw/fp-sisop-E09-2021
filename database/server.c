@@ -20,6 +20,7 @@ char curr_db[SMALL] = {0};
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
 const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
+static const char *SYS_LOG_PATH = "/home/frain8/Documents/Sisop/FP/logging.log";
 
 // Socket setup
 int create_tcp_server_socket();
@@ -50,6 +51,7 @@ bool canAccessDB(int fd, int user_id, char *db_name, bool printError);
 int deleteDB(char *db_name);
 int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
 bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess);
+void logging(const char *user, const char *cmd);
 
 int main()
 {
@@ -635,4 +637,21 @@ void makeDaemon(pid_t *pid, pid_t *sid)
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
+}
+
+void logging(const char *username, const char *cmd)
+{
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    char time[50], date[50];
+    sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(date, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon, tm.tm_mday);
+
+    char output[1000];
+    sprintf(output, "%s %s:%s:%s", date, time, username, cmd);
+
+    FILE *F_out = fopen(SYS_LOG_PATH, "a+");
+    fprintf(F_out, "%s\n", output);
+    fclose(F_out);
 }
