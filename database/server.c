@@ -120,7 +120,7 @@ void grantDB(int fd, char *db_name, char *username)
     }
     bool alreadyExist = false;
 
-    FILE *fp = getTable("config", "permissions", "r", "id,nama_table");
+    FILE *fp = getTable("config", "permissions", "r", "id,nama_db");
     char db[DATA_BUFFER], input[DATA_BUFFER];
     sprintf(input, "%d,%s", target_id, db_name);
     while (fscanf(fp, "%s", db) != EOF) {
@@ -134,7 +134,7 @@ void grantDB(int fd, char *db_name, char *username)
     if (alreadyExist) {
         write(fd, "Info::User already authorized\n\n", SIZE_BUFFER);
     } else {
-        FILE *fp = getTable("config", "permissions", "a", "id,nama_table");
+        FILE *fp = getTable("config", "permissions", "a", "id,nama_db");
         fprintf(fp, "%d,%s\n", target_id, db_name);
         fclose(fp);
         write(fd, "Permission added\n\n", SIZE_BUFFER);
