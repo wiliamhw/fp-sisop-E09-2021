@@ -132,6 +132,7 @@ void *handleInput(void *client_fd)
 void *handleOutput(void *client_fd) 
 {
     int fd = *(int *) client_fd;
+    int counter = 0;
     char message[DATA_BUFFER] = {0};
 
     while (1) {
@@ -140,12 +141,16 @@ void *handleOutput(void *client_fd)
         if (strcmp(message, "change type") == 0) {
             getServerOutput(fd, message);
             strcpy(type, message);
-        } 
+        }
+        else if (strcmp(message, "Wait") == 0) {
+            counter += 1;
+        }
         else {
             printf("%s", message);
+            fflush(stdout);
         }
-        fflush(stdout);
-        wait = false;
+        if (counter == 0) wait = false;
+        else counter--;
     }
 }
 

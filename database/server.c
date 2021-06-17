@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 500
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -8,7 +9,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
-#include <dirent.h>
+#include <ftw.h>
 
 #define DATA_BUFFER 200
 
@@ -21,7 +22,7 @@ const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
 
 // Socket setup
 int create_tcp_server_socket();
-int *makeDaemon(pid_t *pid, pid_t *sid);
+void makeDaemon(pid_t *pid, pid_t *sid);
 
 // Routes & controller
 void *routes(void *argv);
@@ -31,6 +32,7 @@ void useDB(int fd, char *db_name);
 void grantDB(int fd, char *db_name, char *username);
 void createDB(int fd, char *db_name);
 void createTable(int fd, char parsed[20][DATA_BUFFER]);
+void dropDB(int fd, char *db_name);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -40,12 +42,16 @@ void explode(char *string, char storage[20][DATA_BUFFER], const char *delimiter)
 void changeCurrDB(int fd, const char *db_name);
 FILE *getTable(char *db_name, char *table, char *cmd, char *collumns);
 bool dbExist(int fd, char *db_name, bool printError);
+bool tableExist(int fd, char *db_name, char *table, bool printError);
+bool canAccessDB(int fd, int user_id, char *db_name, bool printError);
+int deleteDB(char *db_name);
+int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
 
 int main()
 {
     // TODO:: uncomment on final
     // pid_t pid, sid;
-    // int *status = makeDaemon(&pid, &sid);
+    // makeDaemon(&pid, &sid);
 
     socklen_t addrlen;
     struct sockaddr_in new_addr;
@@ -93,6 +99,11 @@ void *routes(void *argv)
             }
             else write(fd, "Invalid query on CREATE command\n\n", SIZE_BUFFER);
         }
+        else if (strcmp(parsed[0], "DROP") == 0) {
+            if (strcmp(parsed[1], "DATABASE") == 0) {
+                dropDB(fd, parsed[2]);
+            }
+        }
         else if (strcmp(parsed[0], "USE") == 0) {
             useDB(fd, parsed[1]);
         }
@@ -109,7 +120,29 @@ void *routes(void *argv)
     close(fd);
 }
 
+
 /****   Controllers   *****/
+void dropDB(int fd, char *db_name)
+{
+    if (strcmp(db_name, "config") == 0) {
+        write(fd, "Error:Can't drop configuration database\n\n", SIZE_BUFFER);
+        return;
+    }
+    if (!canAccessDB(fd, curr_id, db_name, true)) {
+        return;
+    }
+    if (deleteDB(db_name) == -1) {
+        write(fd, "Error:Unknown error occured when deleting database\n\n", SIZE_BUFFER);
+        return;
+    }
+    // deleteTable("permissions", "db_name", db_name);
+    if (strcmp(curr_db, db_name) == 0) {
+        write(fd, "Wait", SIZE_BUFFER);
+        changeCurrDB(fd, NULL);
+    }
+    write(fd, "Database dropped\n\n", SIZE_BUFFER);
+}
+
 void createTable(int fd, char parsed[20][DATA_BUFFER])
 {
     if (strlen(curr_db) == 0) {
@@ -119,9 +152,7 @@ void createTable(int fd, char parsed[20][DATA_BUFFER])
     char *table = parsed[2];
 
     // Make sure that table doesn't exist in the current database
-    FILE *fp = getTable(curr_db, table, "r", NULL);
-    if (fp != NULL) {
-        fclose(fp);
+    if (tableExist(fd, curr_db, table, false)) {
         write(fd, "Error::Table already exists\n\n", SIZE_BUFFER);
         return;
     }
@@ -137,7 +168,7 @@ void createTable(int fd, char parsed[20][DATA_BUFFER])
         strcat(cols, parsed[i]);
     }
 
-    fp = getTable(curr_db, table, "a", cols);
+    FILE *fp = getTable(curr_db, table, "a", cols);
     fclose(fp);
     write(fd, "Table created\n\n", SIZE_BUFFER);
 }
@@ -201,35 +232,8 @@ void grantDB(int fd, char *db_name, char *username)
 
 void useDB(int fd, char *db_name)
 {
-    if (!dbExist(fd, db_name, true)) {
-        return;
-    }
-    DIR *dp = opendir(db_name);
-    bool authorized = false;
-
-    if (curr_id != 0) {
-        FILE *fp = getTable("config", "permissions", "r", NULL);
-        if (fp != NULL) {
-            char db[DATA_BUFFER], input[DATA_BUFFER];
-            sprintf(input, "%d,%s", curr_id, db_name);
-            while (fscanf(fp, "%s", db) != EOF) {
-                if (strcmp(input, db) == 0) {
-                    authorized = true;
-                    break;
-                }
-            }
-            fclose(fp);
-        } else {
-            authorized = false;
-        }  
-    } else {
-        authorized = true;
-    }
-
-    if (authorized) {
+    if (canAccessDB(fd, curr_id, db_name, true)) {
         changeCurrDB(fd, db_name);
-    } else {
-        write(fd, "Error::Unauthorized access\n\n", SIZE_BUFFER);
     }
 }
 
@@ -263,12 +267,8 @@ bool login(int fd, char *username, char *password)
     int id = -1;
     if (strcmp(username, "root") == 0) {
         id = 0;
-    } else { // Check data in DB
-        FILE *fp = getTable("config", "users", "r", NULL);
-        if (fp != NULL) {
-            id = getUserId(username, password);
-            fclose(fp);
-        }
+    } else if (tableExist(fd, "config", "users", false)) {
+        id = getUserId(username, password); // Check data in DB
     }
 
     if (id == -1) {
@@ -283,11 +283,58 @@ bool login(int fd, char *username, char *password)
 }
 
 /*****  SERVICES  *****/
+int deleteDB(char *db_name)
+{
+    return nftw(db_name, _deleteDB, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+    int rv = remove(fpath);
+    if (rv) perror(fpath);
+    return rv;
+}
+
+bool canAccessDB(int fd, int user_id, char *db_name, bool printError)
+{
+    if (!dbExist(fd, db_name, printError)) {
+        return false;
+    }
+
+    bool authorized = false;
+    if (user_id != 0) {
+        FILE *fp = getTable("config", "permissions", "r", NULL);
+        if (fp != NULL) {
+            char db[DATA_BUFFER], input[DATA_BUFFER];
+            sprintf(input, "%d,%s", user_id, db_name);
+            while (fscanf(fp, "%s", db) != EOF) {
+                if (strcmp(input, db) == 0) {
+                    authorized = true;
+                    break;
+                }
+            }
+            fclose(fp);
+        }
+    } else {
+        authorized = true;
+    }
+    if (!authorized) {
+        write(fd, "Error::Unauthorized access\n\n", SIZE_BUFFER);
+    }
+    return authorized;
+}
+
 void changeCurrDB(int fd, const char *db_name)
 {
-    strcpy(curr_db, db_name);
     write(fd, "change type", SIZE_BUFFER);
-    write(fd, db_name, SIZE_BUFFER);
+    if (db_name == NULL) {
+        memset(curr_db, '\0', sizeof(char) * DATA_BUFFER);
+        write(fd, (curr_id == 0) ? "root" : "user", SIZE_BUFFER);
+    } 
+    else {
+        strcpy(curr_db, db_name);
+        write(fd, db_name, SIZE_BUFFER);
+    }
 }
 
 bool dbExist(int fd, char *db_name, bool printError)
@@ -299,6 +346,18 @@ bool dbExist(int fd, char *db_name, bool printError)
         return false;
     }
     return true;
+}
+
+bool tableExist(int fd, char *db_name, char *table, bool printError)
+{
+    FILE *fp = getTable(db_name, table, "a", NULL);
+    bool exist = (fp != NULL);
+    if (printError && !exist) {
+        write(fd, "Error::Table not found\n\n", SIZE_BUFFER);
+    } else {
+        fclose(fp);
+    }
+    return exist;
 }
 
 int getUserId(char *username, char *password)
@@ -392,7 +451,7 @@ int create_tcp_server_socket()
         fprintf(stderr, "socket failed [%s]\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
@@ -421,7 +480,7 @@ int create_tcp_server_socket()
     return fd;
 }
 
-int *makeDaemon(pid_t *pid, pid_t *sid)
+void makeDaemon(pid_t *pid, pid_t *sid)
 {
     int status;
     *pid = fork();
@@ -442,5 +501,4 @@ int *makeDaemon(pid_t *pid, pid_t *sid)
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-    return &status;
 }

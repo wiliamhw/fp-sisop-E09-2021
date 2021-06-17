@@ -137,24 +137,64 @@
 5. Tampilkan **Table created** pada client.
 
 ### Fitur Drop
+#### Fungsi Delete Table
+1. Buat fungsi `bool deleteTable(fd, <db_name>, <table>, <column>, <value>, printSuccess)`.
+   * `fd` adalah file descriptor milik socket client.
+   * `printSuccess` adalah booelean yang menandakan apakah success message pada fungsi ini akan ditampilkan kepada client atau tidak.
+   * Fungsi ini akan mereturn `true` bila sukses dan `false` bila terjadi error.
+2. `db_used = (<db_name> != NULL) ? db_name : curr_db`.
+3. Pastikan `db_used` tidak NULL.
+   * Jika tidak, tampilkan **Error::No database specified on delete** pada client.
+4. Dapatkan nama tabel yang akan didelete.
+5. Dapatkan jenis delete berdasarkan nilai `<column>` dan `value`.
+   * Jika `<column>` dan `<value>` bernilai `NULL`, hapus semua baris pada `<table>` (**hapus tabel**).
+   * Jika `<column>` tidak `NULL` dan `<value>` bernilai `NULL`, hapus `column` pada `table`. (**hapus kolom**)
+   * Jika tidak ada argumen yang bernilai `NULL`, hapus baris pada `<table>` dimana `<column>` bernilai `<value>`. (**hapus baris tertentu**)
+6. Jika jenisnya adalah **hapus tabel**:
+   1. Hapus semua baris pada tabel dengan menggunakan `fopen(<table>, "w")`.
+   2. Jika `printSuccess == true`, tampilkan **Table deleted** pada client.
+7. Selain itu, lakukan langkah dibawah ini.
+8.  Dapatkan baris pertama pada `table`.
+9.  Pecah baris pertama tersebut per-kata dan simpan di dalam sebuah array.
+10. Dapatkan index `<column>` pada array di langkah sebelum ini. 
+   * Jika tidak ada, tampilkan **Error::Collumn not found** pada client dan return `false`.
+11. Buat tabel baru pada DB yang sedang diakses dengan nama `new-<table>`.
+12. Jika jenis delete adalah **hapus kolom**:
+   1. Untuk masing-masing baris pada `<tabel>`:
+      1. Pecah baris tersebut per-kata dan simpan di dalam sebuah array.
+      2. Untuk masing-masing kata pada array di langkah sebelum ini:
+         1. Dapatkan index kata tersebut pada array.
+         2. Jika index tersebut tidak sama dengan index `<column>`, copy kata tersebut ke `new-<table>`.
+         3. Jika index saat ini bukan index terakhir, print `,` pada `new-<table>`.
+      3. Print `\n` pada `new-<table>` untuk menandakan pergantian baris.
+   2. Jika `printSuccess == true`, tampilkan **Collumn dropped** pada client.
+13. Jika jenis delete adalah **hapus baris tertentu**:
+   3. Initialisasi sebuah counter yang menyimpan banyak baris yang terhapus dengan 0.
+   4. Untuk masing-masing baris pada `<tabel>`:
+      1. Pecah baris tersebut per-kata dan simpan di dalam sebuah array.
+      2. Jika baris tersebut pada index `<column>` tidak bernilai `<value>`, copy baris tersebut ke `new-<table>`.
+      3. Jika tidak, increment counter baris yang terhapus.
+      4. Print `\n` pada `new-<table>` untuk menandakan pergantian baris.
+   5. Jika `printSuccess == true`, tampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
+14. Hapus `<table>` dan ubah nama `new-<table>` menjadi `<table>`.
+15. Return true;
+
 #### Fitur Drop Database
 1. Dapatkan database yang akan didrop dari client dan kirim ke server.
    * Dari perintah: `DROP DATABASE <db_name>`
-2. Jika database yang akan di drop sedang digunakan:
+2. Pastikan database yang dihapus tidak bernama `config`.
+   * Jika statement di atas salah, tampilkan **Error:Can't drop configuration database**.
+3. Jika database yang akan di drop sedang digunakan:
    1. Kosongkan `curr_db` pada server.
    2. Ganti `type` pada client sesuai dengan tipe akun client.
-   3. Lewati langkah ke-3 dan ke-4.
-3. Pastikan database ada pada server.
+   3. Lewati langkah ke-4 dn ke-5.
+4. Pastikan database ada pada server.
    * Jika tidak ada, tampilkan tulisan **Error::Database not found** pada client.
-4. Pastikan client memiliki permissions pada database.
-   * Jika tidak, tampilkan **Error::Unauthorized action**.
-5. Hapus database pada server.
-6. Pada tabel permissions, hapus semua baris dengan `db_name == <nama database yang terhapus`.
-   1. Buat tabel baru bernama **new-permissions**.
-   2. Untuk masing-masing baris pada tabel **permissions**, jika `db_name != <nama database yang terhapus`, copy baris tersebut ke tabel **new-permissions**.
-   3. Hapus tabel **permissions**.
-   4. Ganti nama tabel **new-permissions** menjadi **permissions**.
-7. Tampilkan **Database dropped** pada client.
+5. Pastikan client memiliki permissions pada database.
+   * Jika tidak, tampilkan **Error::Unauthorized access**.
+6. Hapus database pada server.
+7. Pada tabel permissions, hapus semua baris dengan kolom `db_name == <nama database yang terhapus>` dengan perintah `deleteTable(fd, "config", "permissions", "db_name", <nama database yang terhapus>, false)`.
+8. Jika return value dari fungsi `deleteTable` sama dengan `true`, tampilkan **Database dropped** pada client.
 
 #### Fitur Drop Table
 1. Pastikan client sedang menggunakan suatu database.
@@ -166,25 +206,12 @@
 4. Hapus table dengan perintah `remove("<curr_db>/<nama table>")`.
 5. Tampilkan **Table dropped** pada client.
 
-### Fitur Drop Column
+#### Fitur Drop Column
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan nama kolom yang akan didrop beserta tabelnya dari client dan kirim ke server.
 3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
    * Dari perintah: `DROP COLUMN <kolom> FROM <table>;`.
    * Jika tidak ada, tampilkan **Error::Table not found**.
-4. Hapus kolom pada tabel sesuai input.
-   1. Buat tabel baru bernama `new-<table>`.
-   2. Dapatkan baris pertama pada `<table>`.
-   3. Pecah baris pertama per kata ke dalam array dengan delimiter berupa **","**.
-   4. Dapatkan index kolom yang akan dihapus.
-   5. Copy semua kata dalam array selain index yang akan dihapus ke tabel `new-<table>`.
-      * Jika index saat ini bukan index terakhir, print **","** pada tabel baru.
-   6. Untuk masing-masing baris pada tabel `<table>`:
-      1. Pecah baris per kata ke dalam array dengan delimiter berupa **","**.
-      2. Untuk masing-masing kata:
-         1. Jika index saat ini tidak sama dengan index kolom yang akan dihapus, copy kata tersebut ke tabel `new-<table>`.
-         2. Jika index saat ini bukan index terakhir, print **","** pada tabel `new-<table>`.
-5. Hapus tabel lama dengan perintah `remove("<table>")`.
-6. Ganti nama tabel baru dengan perintah `rename("new-<table>", "<table>)`.
-7. Tampilkan **Column dropped** pada client.
+4. Hapus kolom pada tabel di baris tertentu dengan perintah `deleteTable(fd, NULL, <table>, <kolom>, NULL, false)`.
+5. Jika return value dari fungsi `deleteTable` sama dengan `true`, tampilkan **Column dropped** pada client.
