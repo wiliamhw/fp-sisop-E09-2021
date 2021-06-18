@@ -66,9 +66,12 @@ bool login(int fd, int argc, char *argv[])
         // puts(buf);   // TODO:: Comment on final
     } 
     else {
-        puts("Error::Invalid argument");
-        return false;
+        // puts("Error::Invalid argument");
+        // return false;
     }
+    write(fd, "LOGIN root root", SIZE_BUFFER);
+    strcpy(type, "root");
+
     read(fd, buf, SIZE_BUFFER);
     puts(buf);
     return strcmp(buf, "Login success") == 0;
@@ -76,16 +79,7 @@ bool login(int fd, int argc, char *argv[])
 
 bool isValid(char *message)
 {
-    /*
-    * Cek:
-    * 1. Jumlah kata
-    * 2. Format perintah
-    * 4. Diakhiri dengan titik koma (;)
-    * 
-    * Jika return bernilai false, message tidak dikirim ke server
-    */
-    
-    return true; // TODO::Uncomment after finish implementation
+    return true; // TODO::Comment after finish implementation
     if (message[strlen(message) - 1] != ';') {
         return false;
     }
@@ -123,46 +117,44 @@ bool isValid(char *message)
         return false;
     }
     if (strcmp(words[0], "CREATE") == 0) {
-        if (strcmp(words[1], "USER") == 0 && strcmp(words[3], "IDENTIFIED") == 0
-            && strcmp(words[4], "BY") == 0 && words[6][0] == '\0')
-        ) {
+        if (strcmp(words[1], "USER") == 0 && words[2][0] != '\0' && strcmp(words[3], "IDENTIFIED") == 0
+            && strcmp(words[4], "BY") == 0 && words[5][0] != '\0' && words[6][0] == '\0') {
             return true;
         }
-        if (strcmp(words[1], "DATABASE") == 0 && words[3][0] == '\0') {
+        if (strcmp(words[1], "DATABASE") == 0 && words[2][0] != '\0' && words[3][0] == '\0') {
             return true;
         }
-        if (strcmp(words[1], "TABLE")) {
+        if (strcmp(words[1], "TABLE") && words[2][0] != '\0') {
             return true;
         }
+        return false;
+    }
+    else if (strcmp(words[0], "USE") == 0 && words[1][0] != '\0' && words[2][0] == '\0') {
+        return true;
+    }
+    else if (strcmp(words[0], "GRANT") == 0 && strcmp(words[1], "PERMISSION") == 0 
+            && strcmp(words[3], "INTO") == 0 && words[5][0] == '\0'
+    ) {
+        return true;
     }
     else if (strcmp(words[0], "DROP") == 0) {
-        if (strcmp(words[1], "DATABASE") != 0 && strcmp(words[1], "TABLE") != 0 && strcmp(words[1], "COLUMN") != 0) {
-            return false;
+        if ((strcmp(words[1], "DATABASE") == 0 ||  strcmp(words[1], "TABLE") == 0 ) && words[3][0] == '\0') {
+            return true;
         }
-        if (strcmp(words[1], "COLUMN") == 0) {
-            if (strcmp(words[3], "FROM") != 0) {
-                return false;
-            }
+        if (strcmp(words[1], "COLUMN") == 0 && strcmp(words[3], "FROM") && words[5][0] == '\0') {
+            return true;
         }
+        return false;
     }
-    else if (strcmp(words[0], "INSERT") == 0) {
-        if (strcmp(words[1], "INTO") != 0) {
-            return false;
-        }
+    else if (strcmp(words[0], "INSERT") == 0 && strcmp(words[1], "INTO") == 0 && words[4][0] == '\0') {
+        return true;
     }
-    else if (strcmp(words[0], "UPDATE") == 0) {
-        if (strcmp(words[2], "SET") != 0) {
-            return false;
-        }
-    }
-    else if (strcmp(words[0], "DELETE") == 0) {
-        if (strcmp(words[1], "FROM") != 0) {
-            return false;
-        }
-    }
-    else if (strcmp(words[0], "SELECT") == 0) {
-        if (strcmp(words[2], "FROM") != 0) {
-            return false;
+    else if (strcmp(words[0], "DELETE") == 0 && strcmp(words[1], "FROM") == 0) {
+        if (words[3][0] == '\0') {
+            return true;
+        } 
+        else if (strcmp(words[3], "WHERE") && words[5][0] == '\0') {
+            return true;
         }
     }
     return false;
