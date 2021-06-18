@@ -119,10 +119,10 @@ void *handleInput(void *client_fd)
         else {
             if (isValid(message)) {
                 send(fd, message, SIZE_BUFFER, 0);
+                wait = true;
             } else {
                 puts("Invalid query");
             }
-            wait = true;
         }
     }
 }
@@ -154,8 +154,6 @@ void *handleOutput(void *client_fd)
 
 void clearScreen()
 {
-    // const char *CLEAR_SCREEN_ANSI = "\e[1;1H\e[2J";
-    // write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 12);
     printf("\e[1;1H\e[2J");
 }
 
