@@ -3,17 +3,18 @@
 * Semua tabel memiliki ekstensi `.csv`.
 * Panjang query maksimal 20 kata.
 * Panjang kata dalam query maksimal 40 karakter.
+* Dilengkapi dengan fitur clear screen dengan mengetik perintah `cls` pada terminal client.
 <br><br>
 
 # Setup
 1. Buat program server-client multi koneksi berdasarkan pengerjaan dari modul 2 no.1.
    * Program server bernama `server.c`.
    * Program client bernama `client.c`.
-2. Buka `~/.bashrc`, lalu tambahkan `export PATH="$PATH:</path/to/client/dir>"` di baris terakhir.
+2. Buka `~/.bashrc` dengan `nano ~/.bashrc` pada terminal, lalu tambahkan `export PATH="$PATH:</path/to/client/dir>"` di baris terakhir.
    * Langkah ini dilakukan agar program client bisa diakses oleh user dari direktori apapun.
-3. Buka `/etc/sudoers`, lalu `export PATH="$PATH:</path/to/client/dir>"` di baris terakhir.
+3. Buka `/etc/sudoers` dengan `sudo nano /etc/sudoers` pada terminal, lalu `export PATH="$PATH:</path/to/client/dir>"` di baris terakhir.
    * Langkah ini dilakukan agar program client bisa diakses oleh root dari direktori apapun.
-4. Jalankan server pada Daemon.
+4. Buat dan jalankan server pada Daemon
 5. Untuk mematikan server Daemon, lakukan langkah berikut:
    1. Cari pid dari server dengan perintah `ps -aux | grep "server"`.
    2. Kill server dengan perintah `sudo kill -9 <pid>`.
@@ -43,8 +44,10 @@
    * Jika root, `id = 0`.
 6. Jika login gagal, tampilkan pesan gagal dari server ke client.
 7. Jika sukses, tampilkan tulisan **Login success** ke client.
-8. Untuk setiap new line pada terminal client, tuliskan `<tipe akun>@<username>:` di bagian kiri terminal.
+8. Untuk setiap new line pada terminal client, tuliskan `<username>@<x>: ` di bagian kiri terminal.
    * Ada dua tipe akun, yaitu **user** dan **root**.
+   * Jika client sedang menggunakan suatu DB, `x == nama DB yang sedang digunakan`.
+   * Jika tidak, `x == tipe akun`.
 9.  Untuk keluar, tuliskan perintah `quit` atau tekan `Ctrl + C` pada client.
 
 ### Fitur Register
@@ -52,7 +55,7 @@
    * Jika bukan, tampilkan pesan **Error::Forbidden action**.
 2. Dapatkan username dan password akun user baru dari command line argument.
    * Format perintah: `CREATE USER <username> IDENTIFIED BY <password>;`.
-3. Validasi input di bagian client. *TODO*
+3. Validasi input di bagian client.
    * Cek apakah format query sudah sesuai.
 4. Pastikan tidak ada username yang duplikat di db.
    * Jika ada, tampilkan **Error::User is already registered**.
@@ -140,22 +143,23 @@
 
 ### Fitur Drop
 * Penjelasan fungsi `_deleteTable` ada di bagian Data Manipulation Language (DML).
+
 #### Fitur Drop Database
 1. Dapatkan database yang akan didrop dari client dan kirim ke server.
    * Dari perintah: `DROP DATABASE <db_name>`
 2. Pastikan database yang dihapus tidak bernama `config`.
    * Jika statement di atas salah, tampilkan **Error:Can't drop configuration database**.
-3. Jika database yang akan di drop sedang digunakan:
-   1. Kosongkan `curr_db` pada server.
-   2. Ganti `type` pada client sesuai dengan tipe akun client.
-   3. Lewati langkah ke-4 dn ke-5.
 4. Pastikan database ada pada server.
    * Jika tidak ada, tampilkan tulisan **Error::Database not found** pada client.
 5. Pastikan client memiliki permissions pada database.
    * Jika tidak, tampilkan **Error::Unauthorized access**.
 6. Hapus database pada server.
 7. Pada tabel permissions, hapus semua baris dengan kolom `db_name == <nama database yang terhapus>` dengan perintah `_deleteTable(fd, "config", "permissions", "db_name", <nama database yang terhapus>, false)`.
-8. Jika return value dari fungsi `_deleteTable` sama dengan `true`, tampilkan **Database dropped** pada client.
+8. Jika database yang terhapus sedang digunakan:
+   1. Kosongkan `curr_db` pada server.
+   2. Ganti `type` pada client sesuai dengan tipe akun client.
+   3. Lewati langkah ke-4 dan ke-5.
+9. Jika return value dari fungsi `_deleteTable` sama dengan `true`, tampilkan **Database dropped** pada client.
 
 #### Fitur Drop Table
 1. Pastikan client sedang menggunakan suatu database.
@@ -171,11 +175,8 @@
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan nama kolom yang akan didrop beserta tabelnya dari client dan kirim ke server.
-3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
-   * Dari perintah: `DROP COLUMN <kolom> FROM <table>;`.
-   * Jika tidak ada, tampilkan **Error::Table not found**.
-4. Hapus kolom pada tabel di baris tertentu dengan perintah `_deleteTable(fd, NULL, <table>, <kolom>, NULL, false)`.
-5. Jika return value dari fungsi `_deleteTable` sama dengan `true`, tampilkan **Column dropped** pada client.
+3. Hapus kolom pada tabel di baris tertentu dengan perintah `_deleteTable(fd, NULL, <table>, <kolom>, NULL, false)`.
+4. Jika return value dari fungsi `_deleteTable` sama dengan `true`, tampilkan **Column dropped** pada client.
 <br><br>
 
 
@@ -244,16 +245,14 @@
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
 2. Dapatkan tabel yang akan delete dari client dan kirim ke server.
-   * Dari perintah: `DELETE FROM <nama_tabel> WHERE <nama_kolom>=<nilai>;`.
-3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
-   * Jika tidak ada, tampilkan **Error::Table not found**.
-4. Dapatkan nama kolom dan nilai daari perintah.
-5. Jalankan fungsi `_deleteTable(fd, curr_db, <nama_tabel>, <nama_kolom>, <nilai>, true)`
-6. Saat fungsi di atas dijalankan, baris tertentu pada tabel akan terhapus dan akan ditampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
+   * Dari perintah: `DELETE FROM <nama_tabel> WHERE <nama_kolom>=<nilai>;`..
+1. Dapatkan nama kolom dan nilai dari perintah.
+2. Jalankan fungsi `_deleteTable(fd, curr_db, <nama_tabel>, <nama_kolom>, <nilai>, true)`
+3. Saat fungsi di atas dijalankan, baris tertentu pada tabel akan terhapus dan akan ditampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
 
 
 # Logging
 1. Dapatkan username saat client ter-log in ke server.
 2. Jika client sudah ter-logged in, untuk semua query yang dikirim client, lakukan perintah dibawah ini pada server.
 3. Dapatkan tanggal dan waktu query dijalankan.
-4. Tulis tanggal, waktu, username, dan query ke dalam `../logging.log` dengan format`yyyy-mm-dd hh:mm:ss:<username>:<query>`.
+4. Tulis tanggal, waktu, username, dan query ke dalam `logging.log` dengan format`yyyy-mm-dd hh:mm:ss:<username>:<query>`.

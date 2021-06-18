@@ -12,7 +12,6 @@
 #define DATA_BUFFER 150
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
-char username[DATA_BUFFER] = {0};
 char type[DATA_BUFFER] = {0};
 bool wait = false;
 
@@ -27,16 +26,17 @@ bool login(int, int, char *[]);
 
 // Helpet
 bool isValid(char *);
+void clearScreen();
 
 int main(int argc, char *argv[])
 {
     pthread_t tid[2];
     int client_fd = create_tcp_client_socket();
 
+    clearScreen();
     if (!login(client_fd, argc, argv)) {
         return -1;
     }
-    
     pthread_create(&(tid[0]), NULL, &handleOutput, (void *) &client_fd);
     pthread_create(&(tid[1]), NULL, &handleInput, (void *) &client_fd);
 
@@ -53,10 +53,8 @@ bool login(int fd, int argc, char *argv[])
     char buf[DATA_BUFFER];
     if (geteuid() == 0) { // root
         write(fd, "LOGIN root root", SIZE_BUFFER);
-        puts("LOGIN root root"); // TODO:: Delete on final
-
-        strcpy(username, "root");
         strcpy(type, "root");
+        // puts("LOGIN root root");    // TODO:: Comment on final
     } 
     else if (argc == 5
         && strcmp(argv[1] , "-u") == 0
@@ -64,10 +62,8 @@ bool login(int fd, int argc, char *argv[])
     ) { // user
         sprintf(buf, "LOGIN %s %s", argv[2], argv[4]);
         write(fd, buf, SIZE_BUFFER);
-        puts(buf); // TODO:: Delete on final
-
-        strcpy(username, argv[2]);
         strcpy(type, "user");
+        // puts(buf);   // TODO:: Comment on final
     } 
     else {
         puts("Error::Invalid argument");
@@ -75,7 +71,7 @@ bool login(int fd, int argc, char *argv[])
     }
     read(fd, buf, SIZE_BUFFER);
     puts(buf);
-    return strcmp(buf, "Login success\n") == 0;
+    return strcmp(buf, "Login success") == 0;
 }
 
 bool isValid(char *message)
@@ -90,14 +86,6 @@ bool isValid(char *message)
     * 
     * Jika return bernilai false, message tidak dikirim ke server
     */
-    if (strcmp(message, "quit") == 0) {
-        puts("Good bye :3");
-        exit(EXIT_SUCCESS);
-    }
-    else {
-        puts("Invalid query");
-        return false;
-    }
     return true;
 }
 
@@ -109,10 +97,10 @@ void *handleInput(void *client_fd)
 
     while (1) {
         if (wait) {
-            sleep(1); //TODO::Comment on final
+            sleep(0.5);
             continue;
         };
-        printf("%s@%s: ", username, type);
+        printf("%s> ", type);
         fgets(message, DATA_BUFFER, stdin);
 
         // Remove trailing \n
@@ -120,15 +108,22 @@ void *handleInput(void *client_fd)
         if (tmp != NULL) {
             strcpy(message, tmp);
         }
+
         if (strcasecmp(message, "quit") == 0) {
             puts("Good bye :3");
             exit(EXIT_SUCCESS);
         }
-        
-        // if (isValid(message)) { // TODO::Uncomment on final
-            send(fd, message, SIZE_BUFFER, 0);
-        // }
-        wait = true;
+        else if (strcasecmp(message, "cls") == 0) {
+            clearScreen();
+        }
+        else {
+            if (isValid(message)) {
+                send(fd, message, SIZE_BUFFER, 0);
+            } else {
+                puts("Invalid query");
+            }
+            wait = true;
+        }
     }
 }
 
@@ -141,15 +136,15 @@ void *handleOutput(void *client_fd)
     while (1) {
         memset(message, 0, SIZE_BUFFER);
         getServerOutput(fd, message);
-        if (strcmp(message, "change type") == 0) {
+        if (strcmp(message, ">Change type") == 0) {
             getServerOutput(fd, message);
             strcpy(type, message);
         }
-        else if (strcmp(message, "Wait") == 0) {
-            counter += 1;
+        else if (strcmp(message, ">Wait") == 0) {
+            counter += 2;
         }
         else {
-            printf("%s", message);
+            puts(message);
             fflush(stdout);
         }
         if (counter == 0) wait = false;
@@ -157,10 +152,17 @@ void *handleOutput(void *client_fd)
     }
 }
 
+void clearScreen()
+{
+    // const char *CLEAR_SCREEN_ANSI = "\e[1;1H\e[2J";
+    // write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 12);
+    printf("\e[1;1H\e[2J");
+}
+
 void getServerOutput(int fd, char *input)
 {
     if (recv(fd, input, DATA_BUFFER, 0) == 0) {
-        printf("Disconnected from server\n");
+        puts("Disconnected from server");
         exit(EXIT_SUCCESS);
     }
 }
@@ -182,7 +184,7 @@ int create_tcp_client_socket()
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
-    printf("Created a socket with fd: %d\n", fd);
+    // printf("Created a socket with fd: %d\n", fd); // TODO::Comment on final
 
     /* Let us initialize the server address structure */
     saddr.sin_family = AF_INET;

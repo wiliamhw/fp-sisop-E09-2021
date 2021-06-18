@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 500
 #include <stdio.h>
+#include <strings.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -19,7 +20,7 @@ int curr_id = -1;
 char curr_db[SMALL] = {0};
 
 const int SIZE_BUFFER = sizeof(char) * DATA_BUFFER;
-const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases";
+const char *currDir = "/home/frain8/Documents/Sisop/FP/database/databases"; 
 
 // Socket setup
 int create_tcp_server_socket();
@@ -57,8 +58,8 @@ void logging(const char *username, const char *query);
 int main()
 {
     // TODO:: uncomment on final
-    // pid_t pid, sid;
-    // makeDaemon(&pid, &sid);
+    pid_t pid, sid;
+    makeDaemon(&pid, &sid);
 
     socklen_t addrlen;
     struct sockaddr_in new_addr;
@@ -81,7 +82,7 @@ int main()
 
 void *routes(void *argv)
 {
-    chdir(currDir); // TODO:: comment on final
+    chdir(currDir);
     int fd = *(int *) argv;
     bool logged_in = false;
     char username[SMALL];
@@ -89,7 +90,7 @@ void *routes(void *argv)
     char parsed[20][SMALL];
 
     while (read(fd, query, DATA_BUFFER) != 0) {
-        puts(query); // TODO::Comment on final
+        // puts(query); // TODO::Comment on final
         if (logged_in && query[0] != '\0') {
             logging(username, query);
         }
@@ -118,7 +119,7 @@ void *routes(void *argv)
             else if (strcmp(parsed[1], "TABLE") == 0) {
                 createTable(fd, parsed);
             }
-            else write(fd, "Invalid query on CREATE command\n\n", SIZE_BUFFER);
+            else write(fd, "Invalid query on CREATE command", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "DROP") == 0) {
             if (strcmp(parsed[1], "DATABASE") == 0) {
@@ -130,17 +131,17 @@ void *routes(void *argv)
             else if (strcmp(parsed[1], "COLUMN") == 0) {
                 dropColumn(fd, parsed[2], parsed[4]);
             }
-            else write(fd, "Invalid query on DROP command\n\n", SIZE_BUFFER);
+            else write(fd, "Invalid query on DROP command", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "DELETE") == 0 
                 && strcmp(parsed[1], "FROM") == 0) {
             deleteTable(fd, parsed[2], parsed[4]);
         }
-        else write(fd, "Invalid query\n\n", SIZE_BUFFER);
+        else write(fd, "Invalid query", SIZE_BUFFER);
     }
     if (fd == curr_fd) {
         curr_fd = curr_id = -1;
-        memset(curr_db, '\0', sizeof(char) * DATA_BUFFER);
+        bzero(curr_db, SIZE_BUFFER);
     }
     printf("Close connection with fd: %d\n", fd);
     close(fd);
@@ -151,7 +152,7 @@ void *routes(void *argv)
 void deleteTable(int fd, char *table, char *col_val)
 {
     if (curr_db[0] == '\0') {
-        write(fd, "Error::No database used\n\n", SIZE_BUFFER);
+        write(fd, "Error::No database used", SIZE_BUFFER);
         return;
     }
     if (!tableExist(fd, curr_db, table, true)) {
@@ -179,13 +180,12 @@ void deleteTable(int fd, char *table, char *col_val)
 void dropColumn(int fd, char *col, char *table)
 {
     if (curr_db[0] == '\0') {
-        write(fd, "Error::No database used\n\n", SIZE_BUFFER);
-        return;
+        write(fd, "Error::No database used", SIZE_BUFFER);
     }
-    if (tableExist(fd, curr_db, table, true)) {
+    else if (tableExist(fd, curr_db, table, true)) {
         bool isDeleted = _deleteTable(fd, curr_db, table, col, NULL, false);
         if (isDeleted) {
-            write(fd, "Column dropped\n\n", SIZE_BUFFER);
+            write(fd, "Column dropped", SIZE_BUFFER);
         }
     }
 }
@@ -193,49 +193,48 @@ void dropColumn(int fd, char *col, char *table)
 void dropTable(int fd, char *table)
 {
     if (curr_db[0] == '\0') {
-        write(fd, "No database used\n\n", SIZE_BUFFER);
-        return;
+        write(fd, "Error::No database used", SIZE_BUFFER);
     }
-    if (tableExist(fd, curr_db, table, true)) {
+    else if (tableExist(fd, curr_db, table, true)) {
         char path[DATA_BUFFER];
         sprintf(path, "./%s/%s.csv", curr_db, table);
         remove(path);
-        write(fd, "Table dropped\n\n", SIZE_BUFFER);
+        write(fd, "Table dropped", SIZE_BUFFER);
     }
 }
 
 void dropDB(int fd, char *db_name)
 {
     if (strcmp(db_name, "config") == 0) {
-        write(fd, "Error:Can't drop configuration database\n\n", SIZE_BUFFER);
+        write(fd, "Error:Can't drop configuration database", SIZE_BUFFER);
         return;
     }
     if (!canAccessDB(fd, curr_id, db_name, true)) {
         return;
     }
     if (deleteDB(db_name) == -1) {
-        write(fd, "Error:Unknown error occured when deleting database\n\n", SIZE_BUFFER);
+        write(fd, "Error:Unknown error occured when deleting database", SIZE_BUFFER);
         return;
     }
     if (strcmp(curr_db, db_name) == 0) {
-        write(fd, "Wait", SIZE_BUFFER);
+        write(fd, ">Wait", SIZE_BUFFER);
         changeCurrDB(fd, NULL);
     }
     bool isDeleted = _deleteTable(fd, "config", "permissions", "db_name", db_name, false);
-    if (isDeleted) write(fd, "Database dropped\n\n", SIZE_BUFFER);
+    if (isDeleted) write(fd, "Database dropped", SIZE_BUFFER);
 }
 
 void createTable(int fd, char parsed[20][SMALL])
 {
     if (strlen(curr_db) == 0) {
-        write(fd, "Error::No database used\n\n", SIZE_BUFFER);
+        write(fd, "Error::No database used", SIZE_BUFFER);
         return;
     }
     char *table = parsed[2];
 
     // Make sure that table doesn't exist in the current database
     if (tableExist(fd, curr_db, table, false)) {
-        write(fd, "Error::Table already exists\n\n", SIZE_BUFFER);
+        write(fd, "Error::Table already exists", SIZE_BUFFER);
         return;
     }
 
@@ -252,20 +251,20 @@ void createTable(int fd, char parsed[20][SMALL])
 
     FILE *fp = getOrMakeTable(curr_db, table, "a", cols);
     fclose(fp);
-    write(fd, "Table created\n\n", SIZE_BUFFER);
+    write(fd, "Table created", SIZE_BUFFER);
 }
 
 void createDB(int fd, char *db_name)
 {
     if (dbExist(fd, db_name, false)) {
-        write(fd, "Error::Database already exists\n\n", SIZE_BUFFER);
+        write(fd, "Error::Database already exists", SIZE_BUFFER);
     }
     else if (strstr(db_name, "new-") == db_name) { // Can't make dir that start with prefix "new-""
-        write(fd, "Error::Cannot create database with prefix \"new-\"\n\n", SIZE_BUFFER);
+        write(fd, "Error::Cannot create database with prefix \"new-\"", SIZE_BUFFER);
     }
     else if (mkdir(db_name, 0777) == -1) {
         write(fd, 
-            "Error::Unknown error occurred when creating new database\n\n", 
+            "Error::Unknown error occurred when creating new database", 
             SIZE_BUFFER);
     } else {
         if (curr_id != 0) {
@@ -273,14 +272,14 @@ void createDB(int fd, char *db_name)
             fprintf(fp, "%d,%s\n", curr_id, db_name);
             fclose(fp);
         }
-        write(fd, "Database created\n\n", SIZE_BUFFER);
+        write(fd, "Database created", SIZE_BUFFER);
     }
 }
 
 void grantDB(int fd, char *db_name, char *username)
 {
     if (curr_id != 0 || strcmp(db_name, "config") == 0) {
-        write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
+        write(fd, "Error::Forbidden action", SIZE_BUFFER);
         return;
     }
     if (!dbExist(fd, db_name, true)) {
@@ -288,7 +287,7 @@ void grantDB(int fd, char *db_name, char *username)
     }
     int target_id = getUserId(username, NULL);
     if (target_id == -1) {
-        write(fd, "Error::User not found\n\n", SIZE_BUFFER);
+        write(fd, "Error::User not found", SIZE_BUFFER);
         return;
     }
     bool alreadyExist = false;
@@ -306,12 +305,12 @@ void grantDB(int fd, char *db_name, char *username)
     fclose(fp);
 
     if (alreadyExist) {
-        write(fd, "Info::User already authorized\n\n", SIZE_BUFFER);
+        write(fd, "Info::User already authorized", SIZE_BUFFER);
     } else {
         FILE *fp = getTable("config", "permissions", "a");
         fprintf(fp, "%d,%s\n", target_id, db_name);
         fclose(fp);
-        write(fd, "Permission added\n\n", SIZE_BUFFER);
+        write(fd, "Permission added", SIZE_BUFFER);
     }
 }
 
@@ -326,18 +325,18 @@ void regist(int fd, char *username, char *password)
 {
     char *cols = NULL;
     if (curr_id != 0) {
-        write(fd, "Error::Forbidden action\n\n", SIZE_BUFFER);
+        write(fd, "Error::Forbidden action", SIZE_BUFFER);
         return;
     }
     FILE *fp = getOrMakeTable("config", "users", "a", "id,username,password");
     int id = getUserId(username, password);
 
     if (id != -1) {
-        write(fd, "Error::User is already registered\n\n", SIZE_BUFFER);
+        write(fd, "Error::User is already registered", SIZE_BUFFER);
     } else {
         id = getLastId("config", "users") + 1;
         fprintf(fp, "%d,%s,%s\n", id, username, password);
-        write(fd, "Register success\n\n", SIZE_BUFFER);
+        write(fd, "Register success", SIZE_BUFFER);
     }
     fclose(fp);
 }
@@ -345,7 +344,7 @@ void regist(int fd, char *username, char *password)
 bool login(int fd, char *username, char *password)
 {
     if (curr_fd != -1) {
-        write(fd, "Server is busy, wait for other user to logout.\n", SIZE_BUFFER);
+        write(fd, "Server is busy, wait for other user to logout.", SIZE_BUFFER);
         return false;
     }
 
@@ -357,10 +356,10 @@ bool login(int fd, char *username, char *password)
     }
 
     if (id == -1) {
-        write(fd, "Error::Invalid id or password\n", SIZE_BUFFER);
+        write(fd, "Error::Invalid id or password", SIZE_BUFFER);
         return false;
     } else {
-        write(fd, "Login success\n", SIZE_BUFFER);
+        write(fd, "Login success", SIZE_BUFFER);
         curr_fd = fd;
         curr_id = id;
     }
@@ -385,7 +384,7 @@ void logging(const char *username, const char *query)
         output[last_char] = '\0';
     }
 
-    FILE *F_out = fopen("../logging.log", "a+");
+    FILE *F_out = fopen("logging.log", "a+");
     fprintf(F_out, "%s\n", output);
     fclose(F_out);
 }
@@ -394,7 +393,7 @@ void logging(const char *username, const char *query)
 bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
 {
     if (db_name == NULL) {
-        write(fd, "Error::No database specified on delete\n\n", SIZE_BUFFER);
+        write(fd, "Error::No database specified on delete", SIZE_BUFFER);
         return false;
     }
     
@@ -408,7 +407,7 @@ bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool
         fp = getTable(db_name, table, "w");
         fprintf(fp, "%s\n", first_row);
         fclose(fp);
-        if (printSuccess) write(fd, "Table deleted\n\n", SIZE_BUFFER);
+        if (printSuccess) write(fd, "Table deleted", SIZE_BUFFER);
         return true;
     }
 
@@ -430,7 +429,7 @@ bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool
         }
     }
     if (col_index == -1 || last_index == -1) {
-        write(fd, "Error::Collumn not found or schema isn't defined\n\n", SIZE_BUFFER);
+        write(fd, "Error::Collumn not found or schema isn't defined", SIZE_BUFFER);
         return false;
     }
 
@@ -450,7 +449,7 @@ bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool
             }
             fprintf(new_fp, "\n");
         }
-        if (printSuccess) write(fd, "Collumn dropped\n\n", SIZE_BUFFER);
+        if (printSuccess) write(fd, "Collumn dropped", SIZE_BUFFER);
     }
     else { // Delete specific collumn
         int counter  = 0;
@@ -463,7 +462,7 @@ bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool
             }
         }
         if (printSuccess) {
-            sprintf(db, "Delete success, %d row has been deleted\n\n", counter);
+            sprintf(db, "Delete success, %d row has been deleted", counter);
             write(fd, db, SIZE_BUFFER);
         }
     }
@@ -515,16 +514,16 @@ bool canAccessDB(int fd, int user_id, char *db_name, bool printError)
         authorized = true;
     }
     if (!authorized && printError) {
-        write(fd, "Error::Unauthorized access\n\n", SIZE_BUFFER);
+        write(fd, "Error::Unauthorized access", SIZE_BUFFER);
     }
     return authorized;
 }
 
 void changeCurrDB(int fd, const char *db_name)
 {
-    write(fd, "change type", SIZE_BUFFER);
+    write(fd, ">Change type", SIZE_BUFFER);
     if (db_name == NULL) {
-        memset(curr_db, '\0', sizeof(char) * DATA_BUFFER);
+        bzero(curr_db, SIZE_BUFFER);
         write(fd, (curr_id == 0) ? "root" : "user", SIZE_BUFFER);
     } 
     else {
@@ -538,7 +537,7 @@ bool dbExist(int fd, char *db_name, bool printError)
     struct stat s;
     int err = stat(db_name, &s);
     if (err == -1 || !S_ISDIR(s.st_mode)) {
-        if (printError) write(fd, "Error::Database not found\n\n", SIZE_BUFFER);
+        if (printError) write(fd, "Error::Database not found", SIZE_BUFFER);
         return false;
     }
     return true;
@@ -551,7 +550,7 @@ bool tableExist(int fd, char *db_name, char *table, bool printError)
     sprintf(path, "./%s/%s.csv", db_name, table);
     int err = stat(path, &s);
     if (err == -1 || !S_ISREG(s.st_mode)) {
-        if (printError && fd != -1) write(fd, "Error::Table not found\n\n", SIZE_BUFFER);
+        if (printError && fd != -1) write(fd, "Error::Table not found", SIZE_BUFFER);
         return false;
     }
     return true;
@@ -605,7 +604,7 @@ void explode(char string[], char storage[20][SMALL], const char *delimiter)
     strcpy(_buf, string);
     char *buf = _buf;
     char *temp = NULL;
-    memset(storage, '\0', sizeof(char) * 20 * SMALL);
+    bzero(storage, sizeof(char) * 20 * SMALL);
 
     int i = 0;
     while ((temp = strtok(buf, delimiter)) != NULL && i < 20) {
@@ -667,7 +666,7 @@ int create_tcp_server_socket()
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
-    printf("Created a socket with fd: %d\n", fd);
+    // printf("Created a socket with fd: %d\n", fd); // TODO::Comment on final
 
     /* Initialize the socket address structure */
     saddr.sin_family = AF_INET;
@@ -706,6 +705,7 @@ void makeDaemon(pid_t *pid, pid_t *sid)
     umask(0);
 
     *sid = setsid();
+
     if (*sid < 0 || chdir(currDir) < 0) {
         exit(EXIT_FAILURE);
     }
