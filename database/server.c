@@ -714,20 +714,3 @@ void makeDaemon(pid_t *pid, pid_t *sid)
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
 }
-
-void logging(const char *username, const char *cmd)
-{
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-
-    char time[50], date[50];
-    sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
-    sprintf(date, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon, tm.tm_mday);
-
-    char output[1000];
-    sprintf(output, "%s %s:%s:%s", date, time, username, cmd);
-
-    FILE *F_out = fopen(SYS_LOG_PATH, "a+");
-    fprintf(F_out, "%s\n", output);
-    fclose(F_out);
-}
