@@ -139,8 +139,50 @@
 5. Tampilkan **Table created** pada client.
 
 ### Fitur Drop
-#### Fungsi Delete Table
-1. Buat fungsi `bool deleteTable(fd, <db_name>, <table>, <column>, <value>, printSuccess)`.
+* Penjelasan fungsi `_deleteTable` ada di bagian Data Manipulation Language (DML).
+#### Fitur Drop Database
+1. Dapatkan database yang akan didrop dari client dan kirim ke server.
+   * Dari perintah: `DROP DATABASE <db_name>`
+2. Pastikan database yang dihapus tidak bernama `config`.
+   * Jika statement di atas salah, tampilkan **Error:Can't drop configuration database**.
+3. Jika database yang akan di drop sedang digunakan:
+   1. Kosongkan `curr_db` pada server.
+   2. Ganti `type` pada client sesuai dengan tipe akun client.
+   3. Lewati langkah ke-4 dn ke-5.
+4. Pastikan database ada pada server.
+   * Jika tidak ada, tampilkan tulisan **Error::Database not found** pada client.
+5. Pastikan client memiliki permissions pada database.
+   * Jika tidak, tampilkan **Error::Unauthorized access**.
+6. Hapus database pada server.
+7. Pada tabel permissions, hapus semua baris dengan kolom `db_name == <nama database yang terhapus>` dengan perintah `_deleteTable(fd, "config", "permissions", "db_name", <nama database yang terhapus>, false)`.
+8. Jika return value dari fungsi `_deleteTable` sama dengan `true`, tampilkan **Database dropped** pada client.
+
+#### Fitur Drop Table
+1. Pastikan client sedang menggunakan suatu database.
+   * Jika tidak, tampilkan **Error::No database used** pada client.
+2. Dapatkan tabel yang akan didrop dari client dan kirim ke server.
+   * Dari perintah: `DROP TABLE <nama table>;`.
+3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
+   * Jika tidak ada, tampilkan **Error::Table not found**.
+4. Hapus table dengan perintah `remove("<curr_db>/<nama table>")`.
+5. Tampilkan **Table dropped** pada client.
+
+#### Fitur Drop Column
+1. Pastikan client sedang menggunakan suatu database.
+   * Jika tidak, tampilkan **Error::No database used** pada client.
+2. Dapatkan nama kolom yang akan didrop beserta tabelnya dari client dan kirim ke server.
+3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
+   * Dari perintah: `DROP COLUMN <kolom> FROM <table>;`.
+   * Jika tidak ada, tampilkan **Error::Table not found**.
+4. Hapus kolom pada tabel di baris tertentu dengan perintah `_deleteTable(fd, NULL, <table>, <kolom>, NULL, false)`.
+5. Jika return value dari fungsi `_deleteTable` sama dengan `true`, tampilkan **Column dropped** pada client.
+<br><br>
+
+
+# Data Manipulation Language (DML)
+## Fitur Delete
+### Fungsi Delete Table
+1. Buat fungsi `bool _deleteTable(fd, <db_name>, <table>, <column>, <value>, printSuccess)`.
    * `fd` adalah file descriptor milik socket client.
    * `printSuccess` adalah boolean yang menandakan apakah success message pada fungsi ini akan ditampilkan kepada client atau tidak.
    * Fungsi ini akan mereturn `true` bila sukses dan `false` bila terjadi error.
@@ -153,9 +195,11 @@
    * Jika `<column>` tidak `NULL` dan `<value>` bernilai `NULL`, hapus `column` pada `table`. (**hapus kolom**)
    * Jika tidak ada argumen yang bernilai `NULL`, hapus baris pada `<table>` dimana `<column>` bernilai `<value>`. (**hapus baris tertentu**)
 6. Jika jenisnya adalah **hapus tabel**:
-   1. Hapus semua baris pada tabel dengan menggunakan `fopen(<table>, "w")`.
-   2. Jika `printSuccess == true`, tampilkan **Table deleted** pada client.
-   3. Return true
+   1. Dapatkan baris pertama dari tabel.
+   2. Hapus semua baris pada tabel dengan menggunakan `fopen(<table>, "w")`.
+   3. Print baris pertama pada tabel.
+   4. Jika `printSuccess == true`, tampilkan **Table deleted** pada client.
+   5. Return true
 7. Selain itu, lakukan langkah dibawah ini.
 8. Dapatkan baris pertama pada `table`.
 9. Pecah baris pertama tersebut per-kata dan simpan di dalam sebuah array.
@@ -181,39 +225,28 @@
 14. Hapus `<table>` dan ubah nama `new-<table>` menjadi `<table>`.
 15. Return true;
 
-#### Fitur Drop Database
-1. Dapatkan database yang akan didrop dari client dan kirim ke server.
-   * Dari perintah: `DROP DATABASE <db_name>`
-2. Pastikan database yang dihapus tidak bernama `config`.
-   * Jika statement di atas salah, tampilkan **Error:Can't drop configuration database**.
-3. Jika database yang akan di drop sedang digunakan:
-   1. Kosongkan `curr_db` pada server.
-   2. Ganti `type` pada client sesuai dengan tipe akun client.
-   3. Lewati langkah ke-4 dn ke-5.
-4. Pastikan database ada pada server.
-   * Jika tidak ada, tampilkan tulisan **Error::Database not found** pada client.
-5. Pastikan client memiliki permissions pada database.
-   * Jika tidak, tampilkan **Error::Unauthorized access**.
-6. Hapus database pada server.
-7. Pada tabel permissions, hapus semua baris dengan kolom `db_name == <nama database yang terhapus>` dengan perintah `deleteTable(fd, "config", "permissions", "db_name", <nama database yang terhapus>, false)`.
-8. Jika return value dari fungsi `deleteTable` sama dengan `true`, tampilkan **Database dropped** pada client.
+### Penjelasan
+* Perintah untuk menghapus data pada tabel adalah: `DELETE FROM <nama_tabel>;`.
+* Perintah untuk menghapus baris tertentu pada tabel dimana nilai pada suatu kolom sama dengan nilai tertentu adalah: `DELETE FROM <nama_tabel> WHERE <nama_kolom>=<nilai>;`.
 
-#### Fitur Drop Table
+### Penyelesaian
+#### Fitur Hapus Data
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
-2. Dapatkan tabel yang akan didrop dari client dan kirim ke server.
-   * Dari perintah: `DROP TABLE <nama table>;`.
+2. Dapatkan tabel yang akan delete dari client dan kirim ke server.
+   * Dari perintah: `DELETE FROM <nama_tabel>;`.
 3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
    * Jika tidak ada, tampilkan **Error::Table not found**.
-4. Hapus table dengan perintah `remove("<curr_db>/<nama table>")`.
-5. Tampilkan **Table dropped** pada client.
+4. Jalankan fungsi `_deleteTable(fd, curr_db, <nama_tabel>, NULL, NULL, true)`
+5. Saat fungsi di atas dijalankan, data pada tabel akan terhapus dan akan ditampilkan **Table deleted** pada client.
 
-#### Fitur Drop Column
+#### Fitur Hapus Baris Tertentu
 1. Pastikan client sedang menggunakan suatu database.
    * Jika tidak, tampilkan **Error::No database used** pada client.
-2. Dapatkan nama kolom yang akan didrop beserta tabelnya dari client dan kirim ke server.
+2. Dapatkan tabel yang akan delete dari client dan kirim ke server.
+   * Dari perintah: `DELETE FROM <nama_tabel> WHERE <nama_kolom>=<nilai>;`.
 3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
-   * Dari perintah: `DROP COLUMN <kolom> FROM <table>;`.
    * Jika tidak ada, tampilkan **Error::Table not found**.
-4. Hapus kolom pada tabel di baris tertentu dengan perintah `deleteTable(fd, NULL, <table>, <kolom>, NULL, false)`.
-5. Jika return value dari fungsi `deleteTable` sama dengan `true`, tampilkan **Column dropped** pada client.
+4. Dapatkan nama kolom dan nilai daari perintah.
+5. Jalankan fungsi `_deleteTable(fd, curr_db, <nama_tabel>, <nama_kolom>, <nilai>, true)`
+6. Saat fungsi di atas dijalankan, baris tertentu pada tabel akan terhapus dan akan ditampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.

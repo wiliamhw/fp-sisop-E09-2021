@@ -36,6 +36,7 @@ void createTable(int fd, char parsed[20][SMALL]);
 void dropDB(int fd, char *db_name);
 void dropTable(int fd, char *table);
 void dropColumn(int fd, char *col, char *table);
+void deleteTable(int fd, char *table, char *col_val);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -50,7 +51,7 @@ bool tableExist(int fd, char *db_name, char *table, bool printError);
 bool canAccessDB(int fd, int user_id, char *db_name, bool printError);
 int deleteDB(char *db_name);
 int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
-bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess);
+bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess);
 
 int main()
 {
@@ -92,6 +93,12 @@ void *routes(void *argv)
             if (!login(fd, parsed[1], parsed[2]))
                 break;
         }
+        else if (strcmp(parsed[0], "USE") == 0) {
+            useDB(fd, parsed[1]);
+        }
+        else if (strcmp(parsed[0], "GRANT") == 0) {
+            grantDB(fd, parsed[2], parsed[4]);
+        }
         else if (strcmp(parsed[0], "CREATE") == 0) {
             if (strcmp(parsed[1], "USER") == 0) {
                 regist(fd, parsed[2], parsed[5]);
@@ -116,11 +123,9 @@ void *routes(void *argv)
             }
             else write(fd, "Invalid query on DROP command\n\n", SIZE_BUFFER);
         }
-        else if (strcmp(parsed[0], "USE") == 0) {
-            useDB(fd, parsed[1]);
-        }
-        else if (strcmp(parsed[0], "GRANT") == 0) {
-            grantDB(fd, parsed[2], parsed[4]);
+        else if (strcmp(parsed[0], "DELETE") == 0 
+                && strcmp(parsed[1], "FROM") == 0) {
+            deleteTable(fd, parsed[2], parsed[4]);
         }
         else write(fd, "Invalid query\n\n", SIZE_BUFFER);
     }
@@ -134,6 +139,34 @@ void *routes(void *argv)
 
 
 /****   Controllers   *****/
+void deleteTable(int fd, char *table, char *col_val)
+{
+    if (curr_db[0] == '\0') {
+        write(fd, "Error::No database used\n\n", SIZE_BUFFER);
+        return;
+    }
+    if (!tableExist(fd, curr_db, table, true)) {
+        return;
+    }
+    if (col_val == NULL || col_val[0] == '\0') { // Delete table
+        _deleteTable(fd, curr_db, table, NULL, NULL, true);
+    } 
+    else { // Delete specific row
+        char parsed[2][SMALL] = {0}; // 0 => column name, 1 => value
+        strcpy(parsed[0], strtok(col_val, "="));
+        strcpy(parsed[1], strtok(NULL, "="));
+
+        // Remove ' from value
+        int last_char = strlen(parsed[1]) - 1;
+        if (parsed[1][last_char] == '\'') {
+            parsed[1][last_char] = '\0';
+            strcpy(parsed[1], parsed[1] + 1);
+        }
+        
+        _deleteTable(fd, curr_db, table, parsed[0], parsed[1], true);
+    }
+}
+
 void dropColumn(int fd, char *col, char *table)
 {
     if (curr_db[0] == '\0') {
@@ -141,7 +174,7 @@ void dropColumn(int fd, char *col, char *table)
         return;
     }
     if (tableExist(fd, curr_db, table, true)) {
-        bool isDeleted = deleteTable(fd, curr_db, table, col, NULL, false);
+        bool isDeleted = _deleteTable(fd, curr_db, table, col, NULL, false);
         if (isDeleted) {
             write(fd, "Column dropped\n\n", SIZE_BUFFER);
         }
@@ -179,7 +212,7 @@ void dropDB(int fd, char *db_name)
         write(fd, "Wait", SIZE_BUFFER);
         changeCurrDB(fd, NULL);
     }
-    bool isDeleted = deleteTable(fd, "config", "permissions", "db_name", db_name, false);
+    bool isDeleted = _deleteTable(fd, "config", "permissions", "db_name", db_name, false);
     if (isDeleted) write(fd, "Database dropped\n\n", SIZE_BUFFER);
 }
 
@@ -307,10 +340,10 @@ bool login(int fd, char *username, char *password)
         return false;
     }
 
-    int id = -1;
+    int id;
     if (strcmp(username, "root") == 0) {
         id = 0;
-    } else if (tableExist(fd, "config", "users", false)) {
+    } else {
         id = getUserId(username, password); // Check data in DB
     }
 
@@ -326,7 +359,7 @@ bool login(int fd, char *username, char *password)
 }
 
 /*****  SERVICES  *****/
-bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
+bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
 {
     if (db_name == NULL) {
         write(fd, "Error::No database specified on delete\n\n", SIZE_BUFFER);
@@ -335,7 +368,13 @@ bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool 
     
     // Delete table
     if (col == NULL && val == NULL) {
-        FILE *fp = getTable(db_name, table, "w");
+        char first_row[DATA_BUFFER];
+        FILE *fp = getTable(db_name, table, "r");
+        fscanf(fp, "%s", first_row);
+        fclose(fp);
+
+        fp = getTable(db_name, table, "w");
+        fprintf(fp, "%s\n", first_row);
         fclose(fp);
         if (printSuccess) write(fd, "Table deleted\n\n", SIZE_BUFFER);
         return true;
@@ -365,7 +404,7 @@ bool deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool 
 
     char new_table[SMALL];
     sprintf(new_table, "new-%s", table);
-    FILE *new_fp = getTable(db_name, new_table, "w");
+    FILE *new_fp = getOrMakeTable(db_name, new_table, "w", NULL);
 
     // Delete collumn
     if (val == NULL) { 
@@ -557,7 +596,7 @@ FILE *getTable(char *db_name, char *table, char *cmd)
     FILE *fp = NULL;
     if (tableExist(-1, db_name, table, false)) {
         char path[DATA_BUFFER];
-        sprintf(path, "./%s/%s", db_name, table);
+        sprintf(path, "./%s/%s.csv", db_name, table);
         fp = fopen(path, cmd);
     }
     return fp;
@@ -569,9 +608,10 @@ FILE *getOrMakeTable(char *db_name, char *table, char *cmd, char *collumns)
     FILE *fp = getTable(db_name, table, cmd);
     if (fp == NULL) {
         char path[DATA_BUFFER];
-        sprintf(path, "./%s/%s", db_name, table);
+        sprintf(path, "./%s/%s.csv", db_name, table);
+        
         FILE *_fp = fopen(path, "w");
-        fprintf(_fp, "%s\n", collumns);
+        if (collumns != NULL) fprintf(_fp, "%s\n", collumns);
         fclose(_fp);
         fp = fopen(path, cmd);
     }

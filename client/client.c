@@ -53,7 +53,7 @@ bool login(int fd, int argc, char *argv[])
     char buf[DATA_BUFFER];
     if (geteuid() == 0) { // root
         write(fd, "LOGIN root root", SIZE_BUFFER);
-        // puts("LOGIN root root"); // TODO:: Delete on final
+        puts("LOGIN root root"); // TODO:: Delete on final
 
         strcpy(username, "root");
         strcpy(type, "root");
@@ -64,7 +64,7 @@ bool login(int fd, int argc, char *argv[])
     ) { // user
         sprintf(buf, "LOGIN %s %s", argv[2], argv[4]);
         write(fd, buf, SIZE_BUFFER);
-        // puts(buf); // TODO:: Delete on final
+        puts(buf); // TODO:: Delete on final
 
         strcpy(username, argv[2]);
         strcpy(type, "user");
