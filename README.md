@@ -187,6 +187,27 @@
 
 
 # Data Manipulation Language (DML)
+## Fitur Insert
+1. Pastikan client sedang menggunakan suatu database.
+   * Jika tidak, tampilkan **Error::No database used** pada client.
+2. Dapatkan nama tabel dan value yang akan dimasukan ke dalam tabel.
+   * Dari perintah: `INSERT INTO <nama_tabel> (<value>, ...);`.
+3. Pastikan tabel tersebut ada pada database yang sedang digunakan.
+   * Jika tidak ada, tampilkan **Error::Table not found**.
+4. Pecah input per kata dengan **","** sebagai delimiter.
+5. Dapatkan baris pertama pada tabel.
+6. Pastikan banyak kolom pada input sama dengan banyak kolom pada DB.
+   1. Dapatkan banyak kolom pada baris pertama di tabel dan simpen ke dalam variabel `index`.
+   2. Pastikan bahwa kata ke-`index - 1` ada dan kata ke-`index` tidak ada.
+      1. Jika kata ke-`index - 1` tidak ada, tampilkan **Error::Lacking column on insertion** pada client.
+      2. Selain itu, jika kata ke-`index` ada, tampilkan **Error::Too many column on insertion** pada client.
+      3. Keluar dari fungsi ini
+7. Untuk setiap kata pada input:
+   1. Hapus semua karakter "'", "(" dan ")".
+   2. Concat kata tersebut ke string `cols`.
+8. Masukan `cols` ke dalam tabel.
+9. Tampilkan **Insert success** pada client.
+
 ## Fitur Delete
 ### Fungsi Delete Table
 1. Buat fungsi `bool _deleteTable(fd, <db_name>, <table>, <column>, <value>, printSuccess)`.

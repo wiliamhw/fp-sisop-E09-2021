@@ -38,6 +38,7 @@ void dropDB(int fd, char *db_name);
 void dropTable(int fd, char *table);
 void dropColumn(int fd, char *col, char *table);
 void deleteTable(int fd, char *table, char *col_val);
+void insertTable(int fd, char *table, char *input);
 
 // Services
 int getInput(int fd, char *prompt, char *storage);
@@ -54,12 +55,13 @@ int deleteDB(char *db_name);
 int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
 bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess);
 void logging(const char *username, const char *query);
+void removeTick(char str[]);
 
 int main()
 {
     // TODO:: uncomment on final
-    pid_t pid, sid;
-    makeDaemon(&pid, &sid);
+    // pid_t pid, sid;
+    // makeDaemon(&pid, &sid);
 
     socklen_t addrlen;
     struct sockaddr_in new_addr;
@@ -125,17 +127,23 @@ void *routes(void *argv)
             if (strcmp(parsed[1], "DATABASE") == 0) {
                 dropDB(fd, parsed[2]);
             }
-            else if (strcmp(parsed[1], "TABLE") == 0) {
-                dropTable(fd, parsed[2]);
+            else if (curr_db[0] != '\0') {
+                if (strcmp(parsed[1], "TABLE") == 0) {
+                    dropTable(fd, parsed[2]);
+                }
+                else if (strcmp(parsed[1], "COLUMN") == 0) {
+                    dropColumn(fd, parsed[2], parsed[4]);
+                }
+                else write(fd, "Invalid query on DROP command", SIZE_BUFFER);
             }
-            else if (strcmp(parsed[1], "COLUMN") == 0) {
-                dropColumn(fd, parsed[2], parsed[4]);
-            }
-            else write(fd, "Invalid query on DROP command", SIZE_BUFFER);
+            else write(fd, "Error::No database used", SIZE_BUFFER);
         }
         else if (strcmp(parsed[0], "DELETE") == 0 
                 && strcmp(parsed[1], "FROM") == 0) {
             deleteTable(fd, parsed[2], parsed[4]);
+        }
+        else if (strcmp(parsed[0], "INSERT") == 0) {
+            insertTable(fd, parsed[2], parsed[3]);
         }
         else write(fd, "Invalid query", SIZE_BUFFER);
     }
@@ -149,6 +157,63 @@ void *routes(void *argv)
 
 
 /****   Controllers   *****/
+void insertTable(int fd, char *table, char *input)
+{
+    if (curr_db[0] == '\0') {
+        write(fd, "Error::No database used", SIZE_BUFFER);
+        return;
+    }
+    if (!tableExist(fd, curr_db, table, true)) {
+        return;
+    }
+    char parsed[20][SMALL] = {0};
+    explode(input, parsed, ",");
+
+    // Get first row
+    char db[DATA_BUFFER];
+    FILE *fp = getTable(curr_db, table, "r");
+    fscanf(fp, "%s", db);
+    fclose(fp);
+
+    // Make sure that input doesn't exceed the number of column on db
+    int db_col = 1;
+    for (int i = strlen(db) - 1; i >= 0; i--) if (db[i] == ',') db_col++;
+    if (parsed[db_col - 1][0] == '\0') {
+        write(fd, "Error::Lacking column on insertion", SIZE_BUFFER);
+        return;
+    }
+    if (db_col >= 20 || parsed[db_col][0] != '\0') {
+        write(fd, "Error::Too many column on insertion", SIZE_BUFFER);
+        return;
+    }
+
+    // Get collumns
+    char cols[DATA_BUFFER] = {0};
+    for (int i = 0; i < 20; i++) {
+        if (parsed[i][0] == '\0')
+            break;
+
+        // Clean value from "'", "(", and ")"
+        if (parsed[i][0] == '(') {
+            strcpy(parsed[i], parsed[i] + 1);
+        } 
+        int last_char = strlen(parsed[i]) - 1;
+        if (parsed[i][last_char] == ')') {
+            parsed[i][last_char--] = '\0';
+        }
+        if (parsed[i][last_char] == '\'') {
+            removeTick(parsed[i]);
+            last_char -= 2;
+        }
+        if (i != 0) strcat(cols, ",");
+        strcat(cols, parsed[i]);
+    }
+    fp = getTable(curr_db, table, "a");
+    fprintf(fp, "%s\n", cols);
+    fclose(fp);
+    write(fd, "Insert success", SIZE_BUFFER);
+}
+
 void deleteTable(int fd, char *table, char *col_val)
 {
     if (curr_db[0] == '\0') {
@@ -165,24 +230,14 @@ void deleteTable(int fd, char *table, char *col_val)
         char parsed[2][SMALL] = {0}; // 0 => column name, 1 => value
         strcpy(parsed[0], strtok(col_val, "="));
         strcpy(parsed[1], strtok(NULL, "="));
-
-        // Remove ' from value
-        int last_char = strlen(parsed[1]) - 1;
-        if (parsed[1][last_char] == '\'') {
-            parsed[1][last_char] = '\0';
-            strcpy(parsed[1], parsed[1] + 1);
-        }
-        
+        removeTick(parsed[1]);
         _deleteTable(fd, curr_db, table, parsed[0], parsed[1], true);
     }
 }
 
 void dropColumn(int fd, char *col, char *table)
 {
-    if (curr_db[0] == '\0') {
-        write(fd, "Error::No database used", SIZE_BUFFER);
-    }
-    else if (tableExist(fd, curr_db, table, true)) {
+    if (tableExist(fd, curr_db, table, true)) {
         bool isDeleted = _deleteTable(fd, curr_db, table, col, NULL, false);
         if (isDeleted) {
             write(fd, "Column dropped", SIZE_BUFFER);
@@ -192,10 +247,7 @@ void dropColumn(int fd, char *col, char *table)
 
 void dropTable(int fd, char *table)
 {
-    if (curr_db[0] == '\0') {
-        write(fd, "Error::No database used", SIZE_BUFFER);
-    }
-    else if (tableExist(fd, curr_db, table, true)) {
+    if (tableExist(fd, curr_db, table, true)) {
         char path[DATA_BUFFER];
         sprintf(path, "./%s/%s.csv", curr_db, table);
         remove(path);
@@ -226,7 +278,7 @@ void dropDB(int fd, char *db_name)
 
 void createTable(int fd, char parsed[20][SMALL])
 {
-    if (strlen(curr_db) == 0) {
+    if (curr_db[0] == '\0') {
         write(fd, "Error::No database used", SIZE_BUFFER);
         return;
     }
@@ -242,7 +294,7 @@ void createTable(int fd, char parsed[20][SMALL])
     char cols[DATA_BUFFER];
     strcpy(cols, parsed[3] + 1);
     for (int i = 5; i < 20; i+=2) {
-        if (strlen(parsed[i]) == 0) {
+        if (parsed[i][0] == '\0') {
             break;
         }
         strcat(cols, ",");
@@ -390,6 +442,17 @@ void logging(const char *username, const char *query)
 }
 
 /*****  SERVICES  *****/
+void removeTick(char str[])
+{
+    int last_char = strlen(str) - 1;
+    if (str[last_char] == '\'') {
+        str[last_char] = '\0';
+        char temp[SMALL];
+        strcpy(temp, str);
+        strcpy(str, temp + 1);
+    }
+}
+
 bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
 {
     if (db_name == NULL) {
