@@ -44,10 +44,12 @@
    * Jika root, `id = 0`.
 6. Jika login gagal, tampilkan pesan gagal dari server ke client.
 7. Jika sukses, tampilkan tulisan **Login success** ke client.
-8. Untuk setiap new line pada terminal client, tuliskan `<username>@<x>: ` di bagian kiri terminal.
+8. Untuk setiap new line pada terminal client, tuliskan `<x>: ` di bagian kiri terminal.
    * Ada dua tipe akun, yaitu **user** dan **root**.
    * Jika client sedang menggunakan suatu DB, `x == nama DB yang sedang digunakan`.
    * Jika tidak, `x == tipe akun`.
+   * Tampilan terminal:
+   ![Terminal](https://res.cloudinary.com/dx3jourdf/image/upload/v1624010145/terminal_view_btrgdc.png)
 9.  Untuk keluar, tuliskan perintah `quit` atau tekan `Ctrl + C` pada client.
 
 ### Fitur Register
@@ -61,6 +63,8 @@
    * Jika ada, tampilkan **Error::User is already registered**.
 5. Masukan username, password, beserta id ke tabel **users**.
    * Format: `id,username,password`
+   * Tampilan tabel **users**.  
+   ![Tabel users](https://res.cloudinary.com/dx3jourdf/image/upload/v1624010144/users_table_ci8d91.png)
 6. Tampilkan tulisan **Register success** ke client.
 <br><br>
 
@@ -85,7 +89,7 @@
    2. Jika tidak, tampilkan tulisan **Error::Unauthorized access** pada client. 
 4. Simpan nama database ke dalam variabel `curr_db` pada server.
 5. Kirim nama database ke client.
-6. Ganti info pada terminal menjadi `<username>@<nama database>`.
+6. Ganti info pada terminal menjadi `<nama database>`.
 
 ### Fitur Pemeberian Akses Database
 1. Pastikan pengguna yang menggunakan perintah ini adalah root.
@@ -100,6 +104,8 @@
    1. Jika id target dan nama database ada pada tabel tersebut, tampilkan tulisan **Info::User already authorized** pada client.
    2. Jika tidak, lakukan langkah berikutnya.
 6. Masukan id dan nama database ke tabel **permissions** dengan format `<user id>,<nama database>`.
+   * Tampilan tabel **permissions**  
+   ![Tabel permissions](https://res.cloudinary.com/dx3jourdf/image/upload/v1624010144/permissions_table_jt1cur.png)
 7. Pada client, tampilkan tulisan **Permission added**.
 <br><br>
 
@@ -249,10 +255,18 @@
 1. Dapatkan nama kolom dan nilai dari perintah.
 2. Jalankan fungsi `_deleteTable(fd, curr_db, <nama_tabel>, <nama_kolom>, <nilai>, true)`
 3. Saat fungsi di atas dijalankan, baris tertentu pada tabel akan terhapus dan akan ditampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
-
+<br><br>
 
 # Logging
+* Tampilan Log File:  
+![Log file](https://res.cloudinary.com/dx3jourdf/image/upload/v1624010145/logging_ajwlml.png)
+
+## Penyelesaian
 1. Dapatkan username saat client ter-log in ke server.
 2. Jika client sudah ter-logged in, untuk semua query yang dikirim client, lakukan perintah dibawah ini pada server.
 3. Dapatkan tanggal dan waktu query dijalankan.
 4. Tulis tanggal, waktu, username, dan query ke dalam `logging.log` dengan format`yyyy-mm-dd hh:mm:ss:<username>:<query>`.
+
+
+# Kendala
+* Fitur `delete` pada DDL cukup kompleks sehingga memerlukan waktu pengerjaan yang cukup lama.
