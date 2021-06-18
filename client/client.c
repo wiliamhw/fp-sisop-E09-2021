@@ -87,9 +87,6 @@ bool isValid(char *message)
     * Jika return bernilai false, message tidak dikirim ke server
     */
     
-    if (strcmp(message, NULL) == 0) {
-        return false;
-    }
     if (message[strlen(message) - 1] != ';') {
         return false;
     }
@@ -107,6 +104,61 @@ bool isValid(char *message)
         if (cnt_char > 40) {
             return false;
         }
+    }
+    int x = 0, words[25][45], y = 0, it = 0;
+    while(message[x] != '\0') {
+        if (message[x] != ' ') {
+            words[it][y++] = message[x];
+        }
+        else {
+            if (y > 40) {
+                return false;
+            }
+            words[it][y++] = '\0';
+            it++;
+            y = 0;
+        }
+    }
+    if (it > 20) {
+        return false;
+    }
+    if (strcmp(words[0], "CREATE") == 0) {
+        if (strcmp(words[1], "DATABASE") != 0 && strcmp(words[1], "TABLE") != 0) {
+            return false;
+        }
+    }
+    else if (strcmp(words[0], "DROP") == 0) {
+        if (strcmp(words[1], "DATABASE") != 0 && strcmp(words[1], "TABLE") != 0 && strcmp(words[1], "COLUMN") != 0) {
+            return false;
+        }
+        if (strcmp(words[1], "COLUMN") == 0) {
+            if (strcmp(words[3], "FROM") != 0) {
+                return false;
+            }
+        }
+    }
+    else if (strcmp(words[0], "INSERT") == 0) {
+        if (strcmp(words[1], "INTO") != 0) {
+            return false;
+        }
+    }
+    else if (strcmp(words[0], "UPDATE") == 0) {
+        if (strcmp(words[2], "SET") != 0) {
+            return false;
+        }
+    }
+    else if (strcmp(words[0], "DELETE") == 0) {
+        if (strcmp(words[1], "FROM") != 0) {
+            return false;
+        }
+    }
+    else if (strcmp(words[0], "SELECT") == 0) {
+        if (strcmp(words[2], "FROM") != 0) {
+            return false;
+        }
+    }
+    else {
+        return false;
     }
     return true;
 }
