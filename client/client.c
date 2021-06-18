@@ -86,6 +86,28 @@ bool isValid(char *message)
     * 
     * Jika return bernilai false, message tidak dikirim ke server
     */
+    
+    if (strcmp(message, NULL) == 0) {
+        return false;
+    }
+    if (message[strlen(message) - 1] != ';') {
+        return false;
+    }
+    int cnt_char = 0, cnt_kata = 0;
+    for (int i=0; i<strlen(message); i++) {
+        if (message[i] == ' ' || message[i] == ';') {
+            cnt_char = 0;
+            cnt_kata++;
+            if (cnt_kata > 20) {
+                return false;
+            }
+            continue;
+        }
+        cnt_char++;
+        if (cnt_char > 40) {
+            return false;
+        }
+    }
     return true;
 }
 
