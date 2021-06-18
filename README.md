@@ -288,6 +288,9 @@
 3. Dapatkan tanggal dan waktu query dijalankan.
 4. Tulis tanggal, waktu, username, dan query ke dalam `logging.log` dengan format`yyyy-mm-dd hh:mm:ss:<username>:<query>`.
 
+# Error Handling pada Client
+* Buat fungsi validasi query yang memvalidasi kesesuaian query dengan format perintah.
+  * Cek jumlah kata, format perintah, dan diakhiri dengan titik koma.
 
 # Kendala
 * Fitur `delete` pada DDL cukup kompleks sehingga memerlukan waktu pengerjaan yang cukup lama.

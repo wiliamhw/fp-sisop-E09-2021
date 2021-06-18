@@ -80,13 +80,12 @@ bool isValid(char *message)
     * Cek:
     * 1. Jumlah kata
     * 2. Format perintah
-    * 3. Tidak ada kata yang NULL
     * 4. Diakhiri dengan titik koma (;)
-    * 5. Atur authorisasi (akses) dari akun user dan root
     * 
     * Jika return bernilai false, message tidak dikirim ke server
     */
     
+    return true; // TODO::Uncomment after finish implementation
     if (message[strlen(message) - 1] != ';') {
         return false;
     }
@@ -105,7 +104,8 @@ bool isValid(char *message)
             return false;
         }
     }
-    int x = 0, words[25][45], y = 0, it = 0;
+    char words[25][45] = {0};
+    int x = 0, y = 0, it = 0;
     while(message[x] != '\0') {
         if (message[x] != ' ') {
             words[it][y++] = message[x];
@@ -123,8 +123,16 @@ bool isValid(char *message)
         return false;
     }
     if (strcmp(words[0], "CREATE") == 0) {
-        if (strcmp(words[1], "DATABASE") != 0 && strcmp(words[1], "TABLE") != 0) {
-            return false;
+        if (strcmp(words[1], "USER") == 0 && strcmp(words[3], "IDENTIFIED") == 0
+            && strcmp(words[4], "BY") == 0 && words[6][0] == '\0')
+        ) {
+            return true;
+        }
+        if (strcmp(words[1], "DATABASE") == 0 && words[3][0] == '\0') {
+            return true;
+        }
+        if (strcmp(words[1], "TABLE")) {
+            return true;
         }
     }
     else if (strcmp(words[0], "DROP") == 0) {
@@ -157,10 +165,7 @@ bool isValid(char *message)
             return false;
         }
     }
-    else {
-        return false;
-    }
-    return true;
+    return false;
 }
 
 /**    SETUP    **/

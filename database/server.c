@@ -60,8 +60,8 @@ void removeTick(char str[]);
 int main()
 {
     // TODO:: uncomment on final
-    // pid_t pid, sid;
-    // makeDaemon(&pid, &sid);
+    pid_t pid, sid;
+    makeDaemon(&pid, &sid);
 
     socklen_t addrlen;
     struct sockaddr_in new_addr;
