@@ -250,3 +250,10 @@
 4. Dapatkan nama kolom dan nilai daari perintah.
 5. Jalankan fungsi `_deleteTable(fd, curr_db, <nama_tabel>, <nama_kolom>, <nilai>, true)`
 6. Saat fungsi di atas dijalankan, baris tertentu pada tabel akan terhapus dan akan ditampilkan **Delete success, `<counter>` row has been deleted** pada client, dimana `<counter>` adalah banyaknya baris yang terhapus.
+
+
+# Logging
+1. Dapatkan username saat client ter-log in ke server.
+2. Jika client sudah ter-logged in, untuk semua query yang dikirim client, lakukan perintah dibawah ini pada server.
+3. Dapatkan tanggal dan waktu query dijalankan.
+4. Tulis tanggal, waktu, username, dan query ke dalam `../logging.log` dengan format`yyyy-mm-dd hh:mm:ss:<username>:<query>`.

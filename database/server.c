@@ -52,6 +52,7 @@ bool canAccessDB(int fd, int user_id, char *db_name, bool printError);
 int deleteDB(char *db_name);
 int _deleteDB(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
 bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess);
+void logging(const char *username, const char *query);
 
 int main()
 {
@@ -82,16 +83,24 @@ void *routes(void *argv)
 {
     chdir(currDir); // TODO:: comment on final
     int fd = *(int *) argv;
+    bool logged_in = false;
+    char username[SMALL];
     char query[DATA_BUFFER], buf[DATA_BUFFER];
     char parsed[20][SMALL];
 
     while (read(fd, query, DATA_BUFFER) != 0) {
         puts(query); // TODO::Comment on final
+        if (logged_in && query[0] != '\0') {
+            logging(username, query);
+        }
         explode(query, parsed, " ");
 
         if (strcmp(parsed[0], "LOGIN") == 0) {
-            if (!login(fd, parsed[1], parsed[2]))
-                break;
+            if (login(fd, parsed[1], parsed[2])) {
+                strcpy(username, parsed[1]);
+                logged_in = true;
+            } 
+            else break;
         }
         else if (strcmp(parsed[0], "USE") == 0) {
             useDB(fd, parsed[1]);
@@ -358,6 +367,29 @@ bool login(int fd, char *username, char *password)
     return true;
 }
 
+void logging(const char *username, const char *query)
+{
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    char time[SMALL], date[SMALL];
+    sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(date, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon, tm.tm_mday);
+
+    char output[DATA_BUFFER];
+    sprintf(output, "%s %s:%s:%s", date, time, username, query);
+
+    // Remove ";"
+    int last_char = strlen(output) - 1;
+    if (output[last_char] == ';') {
+        output[last_char] = '\0';
+    }
+
+    FILE *F_out = fopen("../logging.log", "a+");
+    fprintf(F_out, "%s\n", output);
+    fclose(F_out);
+}
+
 /*****  SERVICES  *****/
 bool _deleteTable(int fd, char *db_name, char *table, char *col, char *val, bool printSuccess)
 {
@@ -609,7 +641,7 @@ FILE *getOrMakeTable(char *db_name, char *table, char *cmd, char *collumns)
     if (fp == NULL) {
         char path[DATA_BUFFER];
         sprintf(path, "./%s/%s.csv", db_name, table);
-        
+
         FILE *_fp = fopen(path, "w");
         if (collumns != NULL) fprintf(_fp, "%s\n", collumns);
         fclose(_fp);
